@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Night Market — rough base</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Main menu overlay - title screen only (main.js toggles .visible based
+       on mode). Separate from the in-scene sign clicks (titleScreen.js) -
+       this is the flat corner nav from your mockup, not part of the 3D
+       building. -->
+  <nav id="main-menu">
+    <img id="main-menu-logo" src="/logo.png" alt="logo" />
+    <ul id="main-menu-list">
+      <li class="has-submenu">
+        <span class="menu-label" data-toggle="portfolio">Portfolio <span class="menu-arrow">&gt;</span></span>
+        <ul class="submenu">
+          <li data-route="portfolio-graphic-design">Graphic Design</li>
+          <li data-route="portfolio-illustration">Illustration</li>
+          <li data-route="portfolio-merchandise-design">Merchandise Design</li>
+          <li data-route="portfolio-dynamics">Dynamics</li>
+          <li data-route="portfolio-3d-modeling">3D Modeling</li>
+        </ul>
+      </li>
+      <li class="has-submenu">
+        <span class="menu-label" data-toggle="explore">Explore <span class="menu-arrow">&gt;</span></span>
+        <ul class="submenu">
+          <li data-route="explore-archive-shop">Archive Shop</li>
+          <li data-route="explore-records">Records</li>
+          <li data-route="explore-prints-figures">Prints/Action Figures</li>
+          <li data-route="explore-packaging">Packaging</li>
+        </ul>
+      </li>
+      <li data-route="contact">Contact</li>
+      <li data-route="about">About</li>
+      <!-- Walk-mode dropdown only - hidden on the title screen's copy of
+           this same list (see #menu-home-item.hidden in style.css / the
+           reveal in startTransition() in main.js). Flies back to the exact
+           spawn pose via the same LOCATIONS['home'] entry every other item
+           uses. -->
+      <li data-route="home" id="menu-home-item" class="hidden">Home</li>
+    </ul>
+  </nav>
+
+  <!-- Social links - same title-screen-only visibility as #main-menu (see
+       main.js). Instagram/Twitter/LinkedIn all go straight to your real
+       profiles now, no JS handling needed on any of them.
+       Icons are hand-rolled inline SVGs (currentColor, so the CSS
+       color:#fff below just works), not a font/icon-library dependency. -->
+  <div id="social-links">
+    <a href="https://instagram.com/toefulina" target="_blank" rel="noopener noreferrer" data-platform="instagram" aria-label="Instagram">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="2" y="2" width="20" height="20" rx="5" />
+        <circle cx="12" cy="12" r="4.2" />
+        <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
+      </svg>
+    </a>
+    <a href="https://twitter.com/LUVsicHEXALOGY" target="_blank" rel="noopener noreferrer" data-platform="twitter" aria-label="Twitter">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M23 4.9c-.8.4-1.7.6-2.6.8a4.5 4.5 0 0 0 2-2.5c-.9.5-1.9.9-2.9 1.1A4.5 4.5 0 0 0 11.9 8c0 .3 0 .7.1 1A12.7 12.7 0 0 1 2.7 3.9a4.5 4.5 0 0 0 1.4 6 4.4 4.4 0 0 1-2-.6v.1a4.5 4.5 0 0 0 3.6 4.4 4.5 4.5 0 0 1-2 .1 4.5 4.5 0 0 0 4.2 3.1A9 9 0 0 1 1 19.5 12.7 12.7 0 0 0 7.9 21.5c8.3 0 12.8-6.9 12.8-12.8v-.6c.9-.6 1.6-1.4 2.3-2.2z" />
+      </svg>
+    </a>
+    <a href="https://www.linkedin.com/in/miuppa/" target="_blank" rel="noopener noreferrer" data-platform="linkedin" aria-label="LinkedIn">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <rect x="2" y="2" width="20" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <circle cx="7.5" cy="8" r="1.4" />
+        <rect x="6.3" y="10.5" width="2.4" height="7.5" />
+        <path d="M11.5 10.5h2.3v1.1c.4-.7 1.3-1.3 2.6-1.3 2.1 0 3 1.3 3 3.7v4h-2.4v-3.6c0-1-.4-1.7-1.3-1.7-.9 0-1.4.6-1.4 1.7v3.6h-2.4v-7.5z" />
+      </svg>
+    </a>
+  </div>
+
+  <div id="loading-screen">
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+    <div id="loading-label">loading market…</div>
+  </div>
+
+  <div id="intro-overlay">
+    <h1>night market</h1>
+    <p class="desktop-only">WASD to walk, click and drag to look, Shift to run</p>
+    <p class="mobile-only">tap to enter — left joystick to walk, drag right side to look</p>
+  </div>
+
+  <!-- mobile-only touch controls, hidden on desktop via CSS -->
+  <div id="touch-controls" class="mobile-only">
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+  </div>
+
+  <!-- Explore location prev/next arrows - only shown right after flying
+       into one of the Explore submenu's fixed spots (main.js's
+       exploreNav* logic toggles .hidden). Cycle to the adjacent Explore
+       location without going back through the corner menu. Disappear again
+       the moment you move at all (WASD or otherwise) - see main.js for the
+       "moved from the spawn spot" check. -->
+  <div id="explore-nav" class="hidden">
+    <button id="explore-nav-prev" aria-label="Previous location">&lt;</button>
+    <button id="explore-nav-next" aria-label="Next location">&gt;</button>
+  </div>
+
+  <!-- Debug position readout - for grabbing coordinates of spots you like
+       (e.g. a new spawn point) to hand back to Claude. Not part of the
+       final site - delete this div + its CSS + the updatePositionDebug()
+       call in main.js whenever you're done using it. -->
+  <div id="debug-pos"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

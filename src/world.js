@@ -531,6 +531,23 @@ async function addStreetScene(scene) {
     // exact duplicates. 177.0MB -> 153.6MB file size, ~2.38GB -> ~2.15GB
     // estimated decoded GPU memory.
     //
+    // Dead-weight pass - your catch, not something I went looking for:
+    // "a lot of these have normals, i thought this was baked and unlit."
+    // Checked shading.js's toUnlitFlat() directly - it builds a
+    // MeshBasicMaterial and only ever wires up color/map/transparent/
+    // opacity/alphaTest/side. normalTexture, metallicRoughnessTexture, and
+    // (same category, same reason) KHR_materials_specular's specular/
+    // specularColor textures are NEVER read by that material type -
+    // decoded on load, never touch a rendered pixel, for every material
+    // except the (currently 2, actually in-use) LIT_EXCEPTION_MATERIAL_NAMES.
+    // Stripped those three texture slots off every non-exception material,
+    // then fully compacted images/textures/bufferViews so the freed bytes
+    // are actually gone. 550 images -> 290, 153.6MB -> 130.4MB. First pass
+    // at this crashed the verify harness - missed that
+    // KHR_materials_specular's textures live under material.extensions,
+    // not the top-level texture slots, so the index remap broke a handful
+    // of materials before I caught it there instead of on the live site.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

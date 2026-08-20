@@ -476,6 +476,12 @@ async function addStreetScene(scene) {
     // rewired both onto the already-existing BoxMaterial_combocrates_patch
     // material from the round above.
     //
+    // PlasticCrate06's vinyl-part primitive: had it on VynilMaterial.002
+    // (matching what "fucking please.glb" actually specified) - you called
+    // that out as wrong, should be .005. Rewired onto the
+    // VynilMaterial_005_patch material (already built for PlasticCrate02
+    // above, same bake) instead. No texture work needed either.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

@@ -142,7 +142,14 @@ export function buildWorld(scene, renderer) {
   // (~30%) rather than picking new hue/lightness targets from scratch, so
   // it keeps the same purple direction and brightness, just calmer: fog
   // 0x4d3a70 -> 0x4f4167, background 0x3d2c5c -> 0x3e3354.
-  scene.fog = new THREE.Fog(0x4f4167, 32, 55);
+  // "bring the fog back but more of a purple grey and make it slightly
+  // dynamic" - shifted fog the same direction the background already went
+  // ("very greyish purple," line ~146 below): blended 0x4f4167 toward its
+  // own gray equivalent at ~55% (same technique as that pass), landing on
+  // 0x4c4657 - still readably purple, just calmer/greyer to match. The
+  // "dynamic" part is a slow, subtle lightness drift, not a color change
+  // here - see the sine animation on streetFog.color in main.js's tick().
+  scene.fog = new THREE.Fog(0x4c4657, 32, 55);
   // Desaturated background further per "very greyish purple" - pushed the
   // same gray-blend technique from ~30% to ~65%, background only (you
   // asked for the background specifically this round, left fog as-is):

@@ -771,6 +771,15 @@ let elapsed = 0; // accumulated from the same clamped delta tick() uses, so the 
 // runs) and toggled off for the title camera's render, back on for walk
 // mode's.
 const streetFog = scene.fog;
+// "slightly dynamic" - a slow, subtle lightness breathe on the fog color,
+// not a hue change. Base HSL pulled from the color world.js just set
+// (0x4c4657) rather than hardcoded again here, so this stays in sync if
+// that ever changes. Amplitude is small on purpose ("slightly") - +/-4%
+// lightness over a ~38s period reads as gentle drift, not a strobe.
+const fogBaseHSL = { h: 0, s: 0, l: 0 };
+streetFog.color.getHSL(fogBaseHSL);
+const FOG_DRIFT_PERIOD = 38; // seconds per full cycle
+const FOG_DRIFT_AMOUNT = 0.04; // +/- lightness
 
 // Debug position readout, back per your ask - for grabbing an exact spawn
 // point in FURNISHEDSCENE915.glb's coordinate space (the current spawn is
@@ -826,6 +835,13 @@ function tick() {
     // "that fog thing." Only switches back to the real fog once
     // `transition` clears (flight actually finished).
     scene.fog = transition ? null : streetFog;
+    if (!transition) {
+      // Drift lightness only - hue/saturation stay locked to the base
+      // purple-grey so this never reads as a color CHANGE, just a soft
+      // breathing in how thick the fog feels.
+      const drift = Math.sin((elapsed / FOG_DRIFT_PERIOD) * Math.PI * 2) * FOG_DRIFT_AMOUNT;
+      streetFog.color.setHSL(fogBaseHSL.h, fogBaseHSL.s, fogBaseHSL.l + drift);
+    }
     // updateTransition() returns whether titleScreen.camera should render
     // THIS frame - read directly from the return value rather than
     // inspecting `transition` afterward, since a Home flight that finishes

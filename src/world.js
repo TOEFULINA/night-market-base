@@ -445,6 +445,29 @@ async function addStreetScene(scene) {
     // the crashes continue, the next lever is the untouched 1024px bucket
     // (231 images, ~1.3GB on its own) or finally sourcing a KTX2 encoder.
     //
+    // Vinyl store item fixes (bakedvinylnewtextures.glb, two rounds): first
+    // round only patched what pixel-diffed as genuinely different
+    // (Box01/03/04 -> "boxbake", PlasticCrate03/06's box part ->
+    // "combocrates", Stickersbox02_Cube.099 reassigned to the ALREADY-
+    // correct SouvenirsMaterial.001 instead of the vinyl-records material
+    // it was wrongly on). Second round, per "change everything": also
+    // patched PlasticCrate02 (cloned off VynilMaterial.004 into its own
+    // material - it was sharing that 19-user material and couldn't be
+    // edited in place), PlasticCrate06's vinyl-part primitive
+    // (VynilMaterial.002, patched in place - sole user), and the record
+    // player (EletronicsMaterial.002, patched in place - shared by
+    // RecordPlayer_Cube.001 AND .070, both get it). Vinyl-family textures
+    // kept at the established 3072 HD cap; record player at the standard
+    // 1024 cap. Also stripped RecordPlayer's emissive entirely (factor +
+    // texture + KHR_materials_emissive_strength) per "i also took emmissive
+    // off of a few things" - the new export has none. Also re-patched the
+    // ground plane bake (groundplanebakeds.glb, same Plane.002/
+    // Material.005 as before - genuinely new content, diff 36 vs the old
+    // bake). Note: the two fresh 3072px HD normal maps this added back
+    // about ~100MB of GPU texture memory on top of the crash-fix pass
+    // above - expected, vinyl is the one family that's deliberately staying
+    // HD.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

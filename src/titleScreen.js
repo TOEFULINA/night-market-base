@@ -117,7 +117,9 @@ const CAMERA_CORNER = new THREE.Vector2(-1, -1);
 // one now instead of near-subliminal. Eased half-life left alone (0.15s)
 // since that's response SPEED, not amount - "more noticeable" was about
 // the offset being too small, not too slow to catch up.
-const PARALLAX_STRENGTH = 1.0; // max look-at target shift (world units) at pointer extremes
+// "cut down the parallax just slightly" - pulled back to 0.8 (a 20% trim
+// off the 1.0 bump, not a big swing back toward the original 0.35).
+const PARALLAX_STRENGTH = 0.8; // max look-at target shift (world units) at pointer extremes
 const PARALLAX_EASE_HALF_LIFE = 0.15; // seconds to close ~half the remaining gap to the target offset
 
 function buildingCenter() {

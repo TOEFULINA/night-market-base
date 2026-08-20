@@ -418,6 +418,17 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // dropping their texture, so the exact same flicker keeps firing with zero
 // pixel data behind it.
 
+// "you can rescale the huge baked and normal maps for the record store
+// from 3k to 2048x2048" - the 4 textures that were still at 3072x3072: the
+// two lit-exception materials' base color + normal (VynilMaterial.004's
+// merged atlas from the material-consolidation pass above, and
+// RecordStoreWallsMaterial.002's wall/floor bake + normal). Downscaled all
+// 4 to 2048x2048 (LANCZOS). Base color stayed JPEG at the same quality it
+// already was; normals stayed lossless PNG, per the project's standing rule
+// of not lossy-compressing normal maps - the resample itself is the only
+// quality cost there. Roughness on both materials was already 1024x1024,
+// untouched. 139.7MB -> 123.4MB.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

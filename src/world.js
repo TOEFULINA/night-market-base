@@ -494,11 +494,14 @@ async function addStreetScene(scene) {
     // Plane.003 -> tripo_node_1b17d649... as of TRY7_SCENE.glb - the flat
     // billboard got replaced by a real building mesh (see the load comment
     // above), same "don't block the title camera" concern carries over.
-    // Its base-color texture got a follow-up patch too, from your standalone
-    // "buildingbake.glb" upload (same node, transform confirmed identical) -
-    // straight swap onto tripo_material_1b17d649's baseColorTexture, normal
-    // map left alone (same 2048px dimensions as what shipped in TRY7,
-    // nothing indicated it changed).
+    // Its base-color texture got two follow-up patches from standalone
+    // "buildingbake.glb" uploads. First just swapped the bake. Second was
+    // "rescaled and new bake" - node transform updated too this time
+    // (translation.y 23.71->16.94, scale.y 51.98->37.26, shorter and
+    // lowered to stay grounded at the new height; x/z untouched, checked
+    // directly against the upload's own node values, not guessed). Normal
+    // map still untouched both times - byte-identical hash across all three
+    // uploads, never actually changed.
     const TITLE_HIDDEN_NODE_NAMES = ['Plane.002', 'tripo_node_1b17d649-d3ad-4287-9088-27fc9b46c0de'];
     for (const rawName of TITLE_HIDDEN_NODE_NAMES) {
       const node = street.getObjectByName(sanitizeGltfName(rawName));

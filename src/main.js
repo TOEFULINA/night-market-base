@@ -178,7 +178,10 @@ const LOCATIONS = {
 // wired), so findAdjacentExploreRoute below just steps past it until you've
 // given me its coordinates - nothing else needs to change once it's added
 // to LOCATIONS above, it'll start showing up in the cycle automatically.
-const EXPLORE_ROUTE_ORDER = ['explore-archive-shop', 'explore-records', 'explore-prints-figures', 'explore-packaging'];
+// "lets re order the menu so its records, archive, prints, then packaging.
+// i dont like how its not in horizontal order" - matches index.html's
+// submenu list order (kept in sync, see the comment above LOCATIONS).
+const EXPLORE_ROUTE_ORDER = ['explore-records', 'explore-archive-shop', 'explore-prints-figures', 'explore-packaging'];
 
 // "the transition between the archive and vinyl store goes through the
 // wall" - there's no real wall collision anywhere in this project

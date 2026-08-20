@@ -386,6 +386,38 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
   'VynilMaterial.004',
 ]);
 
+// "a lot of these also have the original material AND the baked. i want
+// just the bake. each model apart from our agreed upon should really only
+// have one texture map" - checked every material in TRY7_SCENE.glb
+// directly: 307 already carry exactly one texture map, 10 carry none (flat
+// color, nothing to strip), and the 2 lit exceptions above legitimately
+// carry 3 (baseColor + normal + roughness, the thing you actually asked
+// for on wall/floor/vinyl). The other 21 had TWO - a baseColorTexture AND
+// an emissiveTexture - none of them lit exceptions, so they all go through
+// toUnlitFlat(), which only ever reads material.map and falls back to
+// emissiveMap ONLY when .map is missing (shading.js). Since all 21 have a
+// baseColorTexture, the emissiveTexture's pixels were already dead - never
+// sampled at render time, same "decoded but never drawn" waste as the
+// normal/roughness strip before it. Pixel-checked all 21 pairs before
+// touching anything (not assumed): 11 were literal duplicates of the same
+// image in both slots, the rest had a real bake in baseColorTexture
+// (several literally named "...BAKED" or "lightbaked-...") paired with an
+// unrelated or near-blank emissive image - baseColorTexture was the
+// intentional content in every case. Stripped emissiveTexture off all 21,
+// then compacted images/textures/bufferViews (290->284 images).
+//
+// One thing worth guarding rather than blindly stripping: toUnlitFlat's LED
+// flicker effect triggers off `hasEmissive`, which is true if EITHER
+// emissiveMap is present OR emissiveFactor is a nonzero color - it never
+// reads the emissive texture's actual pixels either way, just uses presence
+// as a boolean. 18 of the 21 already had an emissiveFactor set, so dropping
+// their texture doesn't touch whether they flicker. The other 3 (the
+// B_CeilingLight materials - real light fixtures, where flicker is clearly
+// intentional) had no emissiveFactor and were relying solely on emissiveMap
+// presence to flicker - gave those 3 an emissiveFactor of [1,1,1] before
+// dropping their texture, so the exact same flicker keeps firing with zero
+// pixel data behind it.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

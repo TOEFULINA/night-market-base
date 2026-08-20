@@ -372,6 +372,18 @@ const WORLD_SIZE = 60;
 const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
   'RecordStoreWallsMaterial.002',
   'Material_#1111223369_2', 'Material_#5366',
+  // "i want normals on the wall, floor, and vinyl in the vinyl shop" -
+  // wall/floor is RecordStoreWallsMaterial.002 above, already covered.
+  // The vinyl itself is this whole family - all 5 variants currently in
+  // use (VynilMaterial.001/.002/.003/.004 plus the .005 clone built for
+  // PlasticCrate02), added together so every vinyl prop in the shop reads
+  // consistently lit rather than some staying flat. Their normal/
+  // roughness textures were stripped by the "dead weight" pass right
+  // before this ask (they weren't lit exceptions yet, so toUnlitFlat was
+  // never going to read them) - restored from the pre-strip commit, same
+  // bytes as before, not a re-bake.
+  'VynilMaterial.001', 'VynilMaterial.002', 'VynilMaterial.003',
+  'VynilMaterial.004', 'VynilMaterial_005_patch',
 ]);
 
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four

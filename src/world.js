@@ -459,6 +459,14 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // both were already uniform flat alpha, so that alpha carried straight
 // into the new baseColorFactor too. 123.4MB -> 119.8MB.
 
+// "the roughness can be removed from the walls but keep the normal and
+// base color" - RecordStoreWallsMaterial.002 keeps normalTexture and
+// baseColorTexture, dropped metallicRoughnessTexture. Roughness now
+// defaults to glTF's spec default (1.0, fully rough / no specular
+// highlight) since nothing else sets a roughnessFactor - fine for matte
+// walls, and a one-line roughnessFactor tweak if it ever reads wrong,
+// rather than carrying a whole texture for it. 119.8MB -> 118.8MB.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

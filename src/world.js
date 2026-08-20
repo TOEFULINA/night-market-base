@@ -558,21 +558,26 @@ async function addStreetScene(scene) {
 // BUILDING.glb" - a single standalone mesh, not a swap onto anything in the
 // main street scene). Placement is NOT guessed - the source file already
 // carries a real position/rotation/scale baked onto its one node
-// (translation ~44.8/16.3/-4.0, uniform scale ~57.6x), well outside the
+// (translation ~47.4/16.5/-6.8, uniform scale ~57.6x), well outside the
 // walkable radius (controls.js's WORLD_RADIUS is 30), consistent with "put
 // it behind the walkable scene" - so this just loads the file and adds it
 // as-is, no transform copying needed like the other additive rebakes.
 //
-// Optimization: the source shipped 3 textures (Color 8192x8192, NormalGL
-// 4096x4096, ORM 4096x4096 - a full PBR set from what looks like an AI
-// mesh-gen tool export, "tripo_..." names). Only Color survives - this mesh
-// goes through toUnlitFlat() below same as everything else baked in this
-// scene, which only ever reads material.map; normal/ORM are never sampled
-// by an unlit MeshBasicMaterial, so shipping them would've been pure dead
-// weight. Color resized 8192 -> 1024px (this project's own "background
-// clutter" tier, see public/models/README.md) since it's meant to be seen
-// from a distance, not walked up to. Landed at 0.44MB from the 5.8MB raw
-// upload.
+// Re-processed from your second upload, which had your own re-baked/
+// compressed color texture ("extrabuildingfiller_baked", 1024x1024) already
+// swapped in, position nudged, and Draco compression turned on for the
+// geometry - re-extracted fresh from that file rather than reusing the
+// first pass. Still dropped NormalGL/ORM (this mesh goes through
+// toUnlitFlat() below same as everything else baked in this scene, which
+// only ever reads material.map - normal/ORM are never sampled by an unlit
+// MeshBasicMaterial, so shipping them is dead weight regardless of which
+// upload they came from). Also baked a strong Gaussian blur (radius 14 at
+// 1024px) directly into the texture per "waaaay more blurred for
+// perspective" - this project has no real depth-of-field render pass, so a
+// pre-blurred texture is the cheap equivalent for a background element that
+// should read as soft/hazy/distant rather than crisp. Texture has real
+// (non-cutout) alpha - carried through as alphaMode BLEND, not forced
+// opaque.
 async function addBackgroundBuilding(scene) {
   try {
     const { scene: bg } = await loadModel('/models/BG_BUILDING.glb');

@@ -27,6 +27,13 @@ const camera = new THREE.PerspectiveCamera(
   // it every frame.
   2500
 );
+// Layer 1 = "walk-mode-only" geometry (currently just the new ground plane
+// and wall+building from TRY6_SCENE.glb, see world.js's TITLE_HIDDEN_NODE_NAMES) -
+// enabling it here on top of the default layer 0 means this camera renders
+// everything as normal. titleScreen.js's OrthographicCamera deliberately
+// does NOT enable layer 1, so those two nodes only ever show up in walk
+// mode, never behind the title screen's sign-building view.
+camera.layers.enable(1);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 // cap pixel ratio - rendering at full 3x retina resolution on a phone is a

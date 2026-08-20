@@ -262,7 +262,13 @@ export function buildWorld(scene, renderer) {
   const atmosphere = createAtmosphere(scene);
 
   addStreetScene(scene);
-  addBackgroundBuilding(scene);
+  // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
+  // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
+  // directly into the main scene (node tripo_node_...001, loaded as part of
+  // addStreetScene above already), so calling this too would add a second,
+  // duplicate copy on top. Function left defined below, not deleted - same
+  // "unwire don't delete" pattern as the five per-room rebake overlays -
+  // in case a future export goes back to shipping it as a standalone file.
 
   return { updateAtmosphere: atmosphere.update };
 }
@@ -373,29 +379,57 @@ async function addStreetScene(scene) {
   loadingManager.itemStart(STREET_LOADING_TOKEN);
   try {
     // TRY5_SCENE.glb - latest full-scene pass, replacing TRY4_SCENE.glb.
-    // Source upload: 921_WEB_OPTIMIZED_FINALSAVE_allbaked.glb, 647MB raw
-    // (644MB of it images across 546 textures), Draco-compressed already
-    // (721 nodes / 643 meshes / 337 materials). Continuity with TRY4
-    // verified directly, not assumed: every name this codebase references -
-    // all 17 MENU_SIGN_NODE_NAMES (titleScreen.js), all 14
-    // THRIFT_SIMPLE_SWAP_NODE_NAMES, all 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,
-    // plus the crates/glass-building/cover-supply landmark nodes - resolves
-    // to a real object under the exact same name in this file. Given that
-    // exact-name continuity plus the "FINALSAVE"/"allbaked" filename, the
-    // five per-room rebake overlays (vinyl/thrift/crates/glass/cover-supply)
-    // are DISABLED below rather than re-applied on top - see the long
-    // comment at their old Promise.all call site for the reasoning.
+    // Source upload: 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb, 691MB raw.
+    // This is TRY5's source (921_WEB_OPTIMIZED_FINALSAVE_allbaked.glb) with
+    // 3 new nodes added on top and nothing removed - verified by diffing
+    // every node name between the two uploads directly (0 removed, exactly
+    // 3 added): Plane.002 ("a new ground plane"), Plane.003 ("a wall with a
+    // building on it"), and a second copy of the standalone BG_BUILDING
+    // mesh, now merged directly into the main scene instead of loaded as
+    // its own file (see the retired addBackgroundBuilding() below).
+    //
+    // The image list is the same story underneath a reshuffled order: byte-
+    // for-byte content hashing (not array position - the order shifted
+    // starting a few images in) showed 543 of 552 images are byte-identical
+    // to something already in 921. TRY5's build already spent real time
+    // correctly processing all of 921's images once (1536px cap/JPEG q80,
+    // the two HD exceptions below, the normal-map-stays-PNG rule) - this
+    // reuses that finished work by content hash instead of redoing it, so
+    // only the 9 genuinely-new images (the new ground/wall/building
+    // textures, plus a handful of re-baked shop textures that came along in
+    // this same upload) needed fresh processing. Landed at 149.5MB, in line
+    // with TRY5's 145.4MB plus the new geometry/textures.
+    //
+    // Continuity with TRY4/TRY5 verified directly, not assumed: every name
+    // this codebase references - all 17 MENU_SIGN_NODE_NAMES (titleScreen.js),
+    // all 14 THRIFT_SIMPLE_SWAP_NODE_NAMES, all 54
+    // VINYL_STORE_SIMPLE_SWAP_NODE_NAMES, plus the crates/glass-building/
+    // cover-supply landmark nodes - resolves to a real object under the
+    // exact same name in this file too. Same reasoning as before: the five
+    // per-room rebake overlays (vinyl/thrift/crates/glass/cover-supply) stay
+    // DISABLED - see the long comment at their old Promise.all call site.
+    //
+    // A few shop textures came back different-but-same-index-story as part
+    // of this same content-hash diff: "baked figurines main" and "baked
+    // bravest back light baked" are genuinely new content (not reused from
+    // 921) - likely the fix for the merch-shelf shelf you flagged as stale
+    // ("PACKAGING DESIGN BY TOEFU"/BRAVEST/figurines), since this upload
+    // came right after you confirmed that was an old-textures problem.
     //
     // Standard 1536px-cap/JPEG-q80 texture treatment applied scene-wide
-    // (same as TRY4), landing at 145MB - bigger than TRY4's 90.7MB almost
-    // entirely because of explicit HD exceptions per your ask: the vinyl
-    // store wall/floor bake (RecordStoreWallsMaterial.002) and "the vinyl"
-    // records material (VynylMaterial.004) both got a 3072px cap instead of
-    // 1536, AND their normal maps were kept as lossless PNG rather than
-    // JPEG (JPEG's block/chroma artifacts visibly corrupt normal-encoded
-    // surface direction - not an acceptable tradeoff for "keep this good").
-    // Thrift store clothing/shoe items also got the 3072px HD treatment.
-    const { scene: street } = await loadModel('/models/TRY5_SCENE.glb');
+    // (same as TRY4/TRY5), with the same two called-out HD exceptions: the
+    // vinyl store wall/floor bake (RecordStoreWallsMaterial.002) and "the
+    // vinyl" records material (VynylMaterial.004) both got a 3072px cap
+    // instead of 1536, AND their normal maps were kept as lossless PNG
+    // rather than JPEG (JPEG's block/chroma artifacts visibly corrupt
+    // normal-encoded surface direction - not an acceptable tradeoff for
+    // "keep this good"). Thrift store clothing/shoe items also got the
+    // 3072px HD treatment. The new ground/wall/building textures got the
+    // standard tier - none of them were called out as needing HD, and the
+    // BG building's own base-color bake got its own separate lossless-no-
+    // blur treatment (see the merge note further down) since that one's a
+    // finished asset of yours, not raw source to recompress hard.
+    const { scene: street } = await loadModel('/models/TRY6_SCENE.glb');
 
     // Baked/unlit by DEFAULT now - only LIT_EXCEPTION_MATERIAL_NAMES above
     // (just the record-store wall's normal map at this point - see the note
@@ -446,6 +480,36 @@ async function addStreetScene(scene) {
         obj.receiveShadow = newMaterials.some((m) => m !== null && !(m instanceof THREE.MeshBasicMaterial));
       }
     });
+
+    // "i dont want it to block the camera in the main menu" - the new
+    // ground plane (Plane.002) and the wall+building (Plane.003) render
+    // fine in walk mode but risked sitting in the title screen's
+    // orthographic view of the sign building (same `scene`, same objects,
+    // only the camera differs between modes - see main.js/titleScreen.js).
+    // THREE.Layers is the standard fix for "visible from one camera, not
+    // another" without needing a second scene graph or a per-frame
+    // visibility toggle: put these two on layer 1, leave every camera at
+    // its default (layer 0 only) except the walk camera, which explicitly
+    // opts into layer 1 too (see main.js). Title's OrthographicCamera never
+    // enables layer 1, so it simply never sees these two nodes - they're
+    // still fully present/rendered in walk mode. Layers don't inherit
+    // through the hierarchy in three.js (each Object3D checks its own
+    // .layers, not a parent's), but both of these resolve directly to leaf
+    // meshes (verified via the node harness, isMesh true for both, no
+    // children to also flag), so setting it once per node is enough - no
+    // traverse needed. The merged-in BG building (tripo_node_...001) is
+    // NOT included here - it already existed before this upload as a
+    // separate file and nobody flagged it blocking the title view, so it
+    // stays on the default layer, visible from both cameras same as always.
+    const TITLE_HIDDEN_NODE_NAMES = ['Plane.002', 'Plane.003'];
+    for (const rawName of TITLE_HIDDEN_NODE_NAMES) {
+      const node = street.getObjectByName(sanitizeGltfName(rawName));
+      if (node) {
+        node.layers.set(1);
+      } else {
+        console.warn(`[title-hidden] ${rawName} not found in TRY6_SCENE - skipping`);
+      }
+    }
 
     // Windows swap (see addBlackGlassWindows below for the full writeup)
     // runs HERE, before scene.add - it's plain in-code material assignment

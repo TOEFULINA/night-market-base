@@ -427,7 +427,17 @@ async function addStreetScene(scene) {
     // 3072px HD treatment. The BG building's own base-color bake got its
     // own separate lossless-no-blur treatment (see the merge note further
     // down) since that one's a finished asset of yours, not raw source to
-    // recompress hard. The new ground plane's texture is standard tier.
+    // recompress hard.
+    //
+    // Ground plane (Material.005, Plane.002) originally shipped with no
+    // texture at all - just a flat grey baseColorFactor (~0.145). Patched
+    // in after the fact from your "bakedgroundplane.glb" upload, same node/
+    // material/transform already in this file (checked directly), just
+    // adding the real "groundbake" texture. baseColorFactor removed
+    // entirely rather than left at that flat grey, since glTF multiplies
+    // factor x texture and 0.145 would've crushed the new bake to near-
+    // black. Small enough (1024px) it didn't need any downsizing, alpha
+    // checked out fully opaque so shipped as plain RGB.
     //
     // The wall+building's texture (Material.006, Plane.003) is now a
     // second lossless exception, patched in after the fact per "uncompress

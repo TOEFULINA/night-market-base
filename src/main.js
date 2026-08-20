@@ -93,8 +93,44 @@ let controls = null;
 let signsBound = false;
 let vinylInteraction = null;
 let vinylBound = false;
+// "popping up when you enter any of the explore mode spaces for the first
+// time" - set the instant the FIRST title->walk flight starts (startTransition
+// below), so a rapid double-click can't queue it twice; the bubble itself
+// only actually shows once that flight lands (see showWelcomeBubble() and
+// its call site in updateTransition). Session-only (a plain JS flag, not
+// localStorage) - reloading the page counts as a fresh "first time" again,
+// same lightweight choice already made for other "have you seen this
+// once" state in this project.
+let hasEnteredWalkModeBefore = false;
 
 const debugPosEl = document.getElementById('debug-pos');
+const vinylExitBtn = document.getElementById('vinyl-exit-btn');
+vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
+
+const welcomeBubbleEl = document.getElementById('welcome-bubble');
+const WELCOME_BUBBLE_AUTO_DISMISS_MS = 8000;
+let welcomeBubbleDismissTimer = null;
+function dismissWelcomeBubble() {
+  if (!welcomeBubbleEl) return;
+  welcomeBubbleEl.classList.remove('visible');
+  clearTimeout(welcomeBubbleDismissTimer);
+}
+function showWelcomeBubble() {
+  if (!welcomeBubbleEl) return;
+  welcomeBubbleEl.classList.remove('hidden');
+  // rAF so the .hidden->.visible swap actually transitions (opacity/
+  // transform) instead of snapping in - same reason .hidden and .visible
+  // are two separate classes here rather than one, display:none can't be
+  // animated, so this has to start from a "display:flex but opacity:0"
+  // frame first.
+  requestAnimationFrame(() => welcomeBubbleEl.classList.add('visible'));
+  clearTimeout(welcomeBubbleDismissTimer);
+  welcomeBubbleDismissTimer = setTimeout(dismissWelcomeBubble, WELCOME_BUBBLE_AUTO_DISMISS_MS);
+}
+// Click the bubble itself to dismiss early - it's not blocking anything
+// (pointer-events only turn on once .visible, see style.css), just a
+// courtesy for anyone who reads fast and wants it gone sooner.
+welcomeBubbleEl?.addEventListener('click', dismissWelcomeBubble);
 // Hidden while on the title screen per your ask - it used to double as a
 // hover readout there ("title screen - click a sign" / "hovering: X"), but
 // that's gone now (still logging to console on click below, just not
@@ -235,8 +271,10 @@ function startTransition(routeKey) {
   // Logo stays put in the corner in every mode now - only the list under it
   // collapses behind a click once you're walking (see the logo's click
   // handler further down). Social links are still title-screen-only, no
-  // change there.
-  mainMenuListEl?.classList.add('collapsed');
+  // change there. collapseMainMenu() (not a bare .add('collapsed')) so any
+  // submenu left open from the title screen's own copy of this list starts
+  // closed the first time you open the walk-mode dropdown too.
+  collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
   if (debugPosEl) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout
@@ -286,6 +324,13 @@ function startTransition(routeKey) {
   orthoCam.zoom = 1;
   orthoCam.updateProjectionMatrix();
 
+  // Captured now (flight start), not read later at completion - mode is
+  // already 'walk' by the time this flight lands regardless of whether it
+  // was your first entry or not, so "was this actually the first one" has
+  // to be decided here while we still know.
+  const showWelcome = !hasEnteredWalkModeBefore;
+  hasEnteredWalkModeBefore = true;
+
   transition = {
     t: 0,
     fromPos, fromQuat,
@@ -295,15 +340,25 @@ function startTransition(routeKey) {
     handoffFov,
     switched: false,
     routeKey,
+    showWelcome,
   };
 
   // Record player click-to-lock (vinylInteraction.js) - see that file for
   // the full writeup. onLocked is the hook for the vinyl animation you're
-  // going to provide separately; just logging for now so there's something
-  // to see in devtools until that exists.
+  // going to provide separately; still logging for now so there's something
+  // to see in devtools until that exists, plus now also showing the "back
+  // to walkaround" button (top right, see index.html/style.css) per your
+  // ask - Escape already exited this view, but nothing on screen told you
+  // that was possible, so this makes the same exit visible/clickable.
   vinylInteraction = new VinylInteraction(camera, renderer.domElement, controls, {
-    onLocked: () => console.log('[vinyl interaction] locked in - vinyl animation hook goes here'),
-    onUnlocked: () => console.log('[vinyl interaction] unlocked, back to normal walk control'),
+    onLocked: () => {
+      console.log('[vinyl interaction] locked in - vinyl animation hook goes here');
+      vinylExitBtn?.classList.remove('hidden');
+    },
+    onUnlocked: () => {
+      console.log('[vinyl interaction] unlocked, back to normal walk control');
+      vinylExitBtn?.classList.add('hidden');
+    },
   });
 }
 
@@ -549,9 +604,11 @@ function updateTransition(delta) {
 
   if (rawT >= 1) {
     const finishedRoute = transition.routeKey;
+    const shouldShowWelcome = transition.showWelcome; // flyToLocation's transitions never set this - stays undefined/falsy there
     transition = null;
     controls.locked = false; // hand control back to WASD/drag-look, camera is already exactly at the spawn pose
     activateExploreNavIfApplicable(finishedRoute);
+    if (shouldShowWelcome) showWelcomeBubble();
   }
   return orthoActive;
 }
@@ -573,8 +630,14 @@ function finishReturnToTitle() {
   titleScreen.rebind();
 
   mainMenuListEl?.classList.remove('collapsed');
+  // Same "no additional drop downs" reset as collapseMainMenu() below -
+  // landing back on the title screen with Portfolio still expanded from
+  // wherever you left it in walk mode would be the same stuck-open bug.
+  allSubmenus.forEach((el) => el.classList.remove('open'));
   document.getElementById('menu-home-item')?.classList.add('hidden');
   socialLinksEl?.classList.remove('hidden');
+  vinylExitBtn?.classList.add('hidden'); // defensive - vinylInteraction.dispose() above didn't fire onUnlocked
+  dismissWelcomeBubble(); // in case you hit Home while it was still up
   if (debugPosEl) debugPosEl.style.display = 'none';
 }
 
@@ -591,15 +654,31 @@ function finishReturnToTitle() {
 const mainMenuEl = document.getElementById('main-menu');
 const mainMenuListEl = document.getElementById('main-menu-list');
 
+const allSubmenus = document.querySelectorAll('#main-menu-list .has-submenu');
+
+// "dont keep the menu open always open it to the regular base subjects. no
+// additional drop downs" - closing the list used to leave whichever
+// submenu (Portfolio/Explore) you'd last expanded still marked .open, so
+// reopening the dropdown later popped straight back to wherever you left
+// it instead of the plain base-level list. Every place that collapses the
+// list now also resets every submenu closed, so it always reopens fresh.
+function collapseMainMenu() {
+  mainMenuListEl?.classList.add('collapsed');
+  allSubmenus.forEach((el) => el.classList.remove('open'));
+}
+
 // Logo click - only does anything in walk mode (title screen already shows
 // the list permanently, no toggle needed there). Same collapsed/expanded
 // mechanics as the Portfolio/Explore submenus below, just one level up.
 document.getElementById('main-menu-logo')?.addEventListener('click', () => {
   if (mode !== 'walk') return;
-  mainMenuListEl?.classList.toggle('collapsed');
+  if (mainMenuListEl?.classList.contains('collapsed')) {
+    mainMenuListEl.classList.remove('collapsed');
+  } else {
+    collapseMainMenu();
+  }
 });
 
-const allSubmenus = document.querySelectorAll('#main-menu-list .has-submenu');
 document.querySelectorAll('.menu-label[data-toggle]').forEach((label) => {
   label.addEventListener('click', () => {
     const parent = label.closest('.has-submenu');
@@ -636,7 +715,7 @@ document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
       // flight, and close the dropdown behind you same as picking a real
       // destination normally would.
       flyToLocation(route);
-      mainMenuListEl?.classList.add('collapsed');
+      collapseMainMenu();
     } else {
       startTransition(route);
     }

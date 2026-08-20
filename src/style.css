@@ -58,6 +58,59 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
 #intro-overlay h1 { font-size: 32px; letter-spacing: 0.08em; text-transform: lowercase; }
 #intro-overlay p { font-size: 14px; opacity: 0.85; }
 
+/* Welcome speech bubble - anchored just right of #main-menu-logo (fixed at
+   top:40px/left:40px, 64px wide - see #main-menu above), same top offset so
+   it lines up beside the logo rather than the menu list below it. White
+   pill/rounded card + small left-pointing tail, matching the reference
+   screenshot's chat-bubble style rather than this project's usual flat-
+   white-on-transparent corner UI - deliberately reads as a little character
+   callout, not chrome. Fades/scales in rather than popping (main.js adds
+   .visible, never just toggles display directly) so it feels like a nudge,
+   not an alert. */
+#welcome-bubble {
+  position: fixed;
+  top: 34px;
+  left: 118px;
+  z-index: 14;
+  max-width: 320px;
+  background: #fff;
+  color: #111;
+  border-radius: 18px;
+  padding: 16px 20px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-8px) scale(0.96);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+#welcome-bubble.visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+#welcome-bubble.hidden { display: none; }
+#welcome-bubble p {
+  margin: 0;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.35;
+}
+/* Tail - CSS border-triangle trick, pointing left toward the logo. Sits at
+   a fixed height rather than vertically centered on the bubble's (variable,
+   text-dependent) height - close enough to the logo's own vertical center
+   for a short one-paragraph bubble like this. */
+#welcome-bubble::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 22px;
+  border-width: 8px 10px 8px 0;
+  border-style: solid;
+  border-color: transparent #fff transparent transparent;
+}
+
 .mobile-only { display: none; }
 .desktop-only { display: block; }
 
@@ -296,6 +349,30 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
 #explore-nav button:hover { opacity: 1; }
 #explore-nav-prev { left: 16px; }
 #explore-nav-next { right: 16px; }
+
+/* Vinyl camera-lock exit button - top right, same flat white/Helvetica
+   treatment as the rest of the corner UI (mirrors #main-menu's top-left
+   40px/40px placement). Text label rather than an icon, same reasoning as
+   the explore-nav arrows - reads as UI chrome, not scene content. */
+#vinyl-exit-btn {
+  position: fixed;
+  top: 40px;
+  right: 40px;
+  z-index: 13;
+  background: none;
+  border: none;
+  color: #fff;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+  cursor: pointer;
+  padding: 10px 14px;
+  transition: opacity 0.15s ease;
+}
+#vinyl-exit-btn:hover { opacity: 1; }
+#vinyl-exit-btn.hidden { display: none; }
 
 /* Debug position readout - see the comment next to it in index.html */
 #debug-pos {

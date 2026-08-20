@@ -85,10 +85,26 @@
     <p class="mobile-only">tap to enter — left joystick to walk, drag right side to look</p>
   </div>
 
+  <!-- First-time walk-mode welcome bubble - speech bubble to the right of
+       #main-menu-logo (see style.css for the positioning/tail, main.js for
+       the show-once-ever/dismiss logic). Separate from #intro-overlay above
+       (that one's unwired now, see controls.js) - this is a smaller, non-
+       blocking replacement with its own personality, not the same feature. -->
+  <div id="welcome-bubble" class="hidden">
+    <p>Hii! Walk around with WASD or use the menu to view some of my work. Click around and see what you find :)</p>
+  </div>
+
   <!-- mobile-only touch controls, hidden on desktop via CSS -->
   <div id="touch-controls" class="mobile-only">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
   </div>
+
+  <!-- Vinyl record-player camera-lock exit - top right, only shown while
+       locked into the close-up view (vinylInteraction.js's onLocked/
+       onUnlocked hooks in main.js toggle .hidden). Escape still works too
+       (see vinylInteraction.js's _onKeyDown) - this just makes the same
+       exit discoverable/clickable instead of being a keyboard-only secret. -->
+  <button id="vinyl-exit-btn" class="hidden">&larr; back to walkaround</button>
 
   <!-- Explore location prev/next arrows - only shown right after flying
        into one of the Explore submenu's fixed spots (main.js's

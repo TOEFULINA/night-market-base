@@ -124,6 +124,13 @@ export class VinylInteraction {
     if (e.code === 'Escape' && this.locked && !this._transitioning) this._unlock();
   }
 
+  // Public entry point for the "back to walkaround" button in main.js -
+  // same guard as the Escape-key path above, just reachable from a click
+  // instead of a keyboard shortcut.
+  unlock() {
+    if (this.locked && !this._transitioning) this._unlock();
+  }
+
   _lockIn() {
     this.locked = true;
     this.controls.locked = true; // controls.js's update() early-returns while this is set, see there

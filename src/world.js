@@ -149,7 +149,13 @@ export function buildWorld(scene, renderer) {
   // 0x4c4657 - still readably purple, just calmer/greyer to match. The
   // "dynamic" part is a slow, subtle lightness drift, not a color change
   // here - see the sine animation on streetFog.color in main.js's tick().
-  scene.fog = new THREE.Fog(0x4c4657, 32, 55);
+  // "mooooore fogggg closer to meeeee" - near pulled way in, 32 -> 10, so
+  // it's no longer fully clear across the whole walkable area (the old
+  // near=32 kept everything inside WORLD_RADIUS totally fog-free, see the
+  // note above) - now it starts creeping in close, just past arm's reach.
+  // far pulled in too, 55 -> 42, so the ramp to full opacity is steeper/
+  // thicker rather than just starting earlier at the same old gentle slope.
+  scene.fog = new THREE.Fog(0x4c4657, 10, 42);
   // Desaturated background further per "very greyish purple" - pushed the
   // same gray-blend technique from ~30% to ~65%, background only (you
   // asked for the background specifically this round, left fog as-is):

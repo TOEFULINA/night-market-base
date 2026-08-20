@@ -95,7 +95,13 @@ const FRAME_CENTER_Y_OFFSET = 1.2;
 // building. Positive shifts the framed window right (pulls more real
 // geometry into that left-edge gap; crops a little more off the right,
 // which had room to spare).
-const FRAME_CENTER_X_OFFSET = 2;
+// "move the entire camera left so the dark building frames those icons a
+// little better, that part looks hella empty" - the dark foreground
+// building on the left edge (behind the menu text/social icons) had
+// thinned out to a sliver after the rightward pan above. Backed off
+// 2 -> 0.5 to pan back left and give it more presence again, without
+// undoing the original right-edge crop fix entirely.
+const FRAME_CENTER_X_OFFSET = 0.5;
 // Which diagonal corner to view from - flipped from the first guess (+1,+1)
 // after you reported seeing a plain windowed back wall instead of the
 // signed face. -1,-1 looks from the opposite corner instead. If this is

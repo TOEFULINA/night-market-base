@@ -235,8 +235,17 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
 .menu-label:hover { opacity: 0.6; }
 
 /* Home - only revealed once in walk mode (main.js removes this class in
-   startTransition), never shown on the title screen's copy of the list. */
-#menu-home-item.hidden { display: none; }
+   startTransition), never shown on the title screen's copy of the list.
+   Selector bumped from a plain #menu-home-item.hidden to this - that
+   version had specificity (1 id, 1 class, 0 type) which actually LOST to
+   the "#main-menu-list > li:not(.has-submenu)" display:inline-flex rule
+   above at (1 id, 1 class-from-:not, 1 type) - one type-selector point
+   higher wins a tie on id/class count. So .hidden was never able to
+   actually hide this on the title screen, the class was being added
+   correctly the whole time, the CSS just couldn't act on it. Adding the
+   #main-menu-list ancestor + li type here brings it to (2, 1, 1), safely
+   above the rule it needs to beat. */
+#main-menu-list li#menu-home-item.hidden { display: none; }
 
 /* ">" indicator - bold, same 1em size as PORTFOLIO/EXPLORE (dropped back
    down from 1.3em - that was inflating the line box taller than the

@@ -476,11 +476,19 @@ async function addStreetScene(scene) {
     // rewired both onto the already-existing BoxMaterial_combocrates_patch
     // material from the round above.
     //
-    // PlasticCrate06's vinyl-part primitive: had it on VynilMaterial.002
-    // (matching what "fucking please.glb" actually specified) - you called
-    // that out as wrong, should be .005. Rewired onto the
-    // VynilMaterial_005_patch material (already built for PlasticCrate02
-    // above, same bake) instead. No texture work needed either.
+    // PlasticCrate06's vinyl-part primitive - went back and forth on this
+    // one, settled by re-reading "fucking please.glb" itself instead of
+    // going on your ".005" shorthand: that file's own materials list is
+    // BoxMaterial.006, BoxMaterial.005, VynilMaterial.002 - there IS no
+    // VynilMaterial.005 in it. The ".005" was BoxMaterial.005 (the crate
+    // box tier, same one PlasticCrate03/04/05 use), and the vinyl half of
+    // the split PlasticCrate06 mesh is plain VynilMaterial.002 ("the
+    // regular vinyl pattern"). Reverted off the VynilMaterial_005_patch
+    // material back onto 281 (VynilMaterial.002, already correctly
+    // textured from the original bakedvinylnewtextures.glb patch). Also
+    // checked "fucking please.glb"'s node transforms against the live
+    // scene directly (translation/rotation/scale, all 5 nodes) - byte-
+    // identical, nothing had actually moved this round.
     //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14

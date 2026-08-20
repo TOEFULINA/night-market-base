@@ -512,6 +512,29 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // left reading real PBR data. 54.8MB -> 49.4MB. Every PNG left in the file
 // now has a specific, checked reason to still be one.
 
+// "i forgot some baked textures for some items. i fixed in here. all are
+// compressable" (missed and forgotten textures.glb) - this is the food-
+// dish atlas and 6 other items from your "i see a few missing textures"
+// screenshots earlier. Matched by node name (Object070/073, Object258,
+// Object1720, Object1405100615_2, Object1405100847_1, Plane1000174), all
+// confirmed the same objects by identical transforms first. The 8 material
+// names here (a_1, Material_#79_1_X, etc) are Blender-generic and ARE
+// shared with unrelated objects elsewhere (Material_#79_1_0/_7 alone also
+// live on 3 iPadBOX nodes) - imported as brand new material/texture
+// entries rather than overwriting those shared slots, so only these 7
+// nodes' primitives changed. Vertex-count-checked every node before
+// deciding material-only-swap vs full transplant: Object070/073, Object1720,
+// and Plane1000174 had identical geometry already in the file (material
+// swap only); Object258 and Object1405100615_2 and all 3 primitives of
+// Object1405100847_1 had different vertex counts (full geometry transplant,
+// same as the crate-saga lesson - matching material name isn't matching
+// geometry). Dropped KHR_materials_specular on all 8 (dead weight, same as
+// every other non-lit-exception material) and converted the 4 PNGs among
+// their 21 images to JPEG q94 per "all are compressable" - none of these
+// materials set alphaMode, so all default OPAQUE and their alpha (even
+// TEALBUILDING_BAKED's real alpha variance) is never actually read.
+// 49.4MB -> 51.3MB.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

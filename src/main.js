@@ -108,6 +108,14 @@ const titleScreen = new TitleScreen(scene, renderer, {
   },
 });
 
+// Snapshot of the ORIGINAL title framing pose, taken right here before
+// anything ever touches titleScreen.camera (parallax nudges the look-at
+// target slightly every frame, and every title->walk flight repositions it
+// outright during the ortho phase). Home (startReturnToTitle below) always
+// flies back to this exact literal pose, not a re-derived approximation.
+const TITLE_HOME_POS = titleScreen.camera.position.clone();
+const TITLE_HOME_QUAT = titleScreen.camera.quaternion.clone();
+
 // Per-route spawn points - grabbed from the #debug-pos readout the same way
 // the default spawn in controls.js was (screenshot it, copy x/y/z/yaw).
 // Routes not listed here fall back to controls.js's default SPAWN_POSITION/
@@ -332,6 +340,59 @@ function flyToLocation(routeKey) {
   };
 }
 
+// Home (walk -> title) - the literal time-reverse of startTransition's
+// two-phase flight, not a page reload. Starts in perspective wherever you
+// currently are, pans/zooms out through a computed handoff pose, hands off
+// to the orthographic title camera for the final leg, and arrives exactly
+// on TITLE_HOME_POS/TITLE_HOME_QUAT (zoom 1) - the literal pose snapshotted
+// right after TitleScreen was constructed, not a re-derived approximation.
+// updateTransition() below reads transition.reverse to know the camera
+// hand-off happens perspective-first/ortho-last here, the opposite order
+// from a normal title->walk flight, and that the zoom/FOV blends run in the
+// opposite direction too (zooming OUT to the wide title framing, not in).
+function startReturnToTitle() {
+  if (mode !== 'walk' || transition || !controls) return;
+
+  hideExploreNav();
+
+  const orthoCam = titleScreen.camera;
+  const orthoHeight = orthoCam.top - orthoCam.bottom;
+  const baseTarget = orthoCam.userData.baseTarget;
+
+  const fromPos = camera.position.clone();
+  const fromQuat = camera.quaternion.clone();
+  const fromFov = camera.fov;
+
+  const toPos = TITLE_HOME_POS.clone();
+  const toQuat = TITLE_HOME_QUAT.clone();
+
+  // Perspective runs FIRST this time (handoffT is measured from the START,
+  // same as the forward flight's handoffT - just now it marks where
+  // perspective HANDS OFF to ortho, rather than where ortho hands off to
+  // perspective). Using 1 - ORTHO_PHASE_FRACTION keeps the same 60/40 ortho/
+  // perspective time split as the forward flight, just mirrored.
+  const handoffT = 1 - ORTHO_PHASE_FRACTION;
+  const easedHandoffT = easeInOutCubic(handoffT);
+  const handoffPos = fromPos.clone().lerp(toPos, easedHandoffT);
+  const handoffDistance = handoffPos.distanceTo(baseTarget);
+  const handoffVisibleHeight = orthoHeight / ORTHO_ZOOM_END;
+  const handoffFov = THREE.MathUtils.radToDeg(2 * Math.atan(handoffVisibleHeight / (2 * handoffDistance)));
+
+  controls.locked = true;
+
+  transition = {
+    t: 0,
+    fromPos, fromQuat, fromFov,
+    toPos, toQuat, toFov: fromFov, // toFov unused on this path (ortho has no fov), kept for shape consistency
+    hasOrthoPhase: true,
+    reverse: true,
+    handoffT,
+    handoffFov,
+    switched: false,
+    routeKey: null,
+  };
+}
+
 // Steps through EXPLORE_ROUTE_ORDER from fromIndex in `direction` (+1/-1),
 // wrapping around, and skips any route that isn't in LOCATIONS yet (see the
 // comment on EXPLORE_ROUTE_ORDER above) - returns null only if NONE of the
@@ -383,7 +444,12 @@ function updateExploreNavVisibility() {
 }
 
 // Call every frame from tick() - no-ops once `transition` is null (either
-// never started, or already finished and cleared below).
+// never started, or already finished and cleared below). Returns true if
+// titleScreen.camera is the one that should render THIS frame, false
+// otherwise - tick() uses this return value directly rather than inspecting
+// `transition` afterward, since a flight that finishes on this exact frame
+// nulls `transition` out below before returning, which would otherwise lose
+// track of which camera this final frame actually needs.
 //
 // Single continuous eased t across the WHOLE flight (see the long comment on
 // `transition` above for why - two separately-eased halves glued together
@@ -392,14 +458,55 @@ function updateExploreNavVisibility() {
 // just a question of where rawT sits relative to handoffT, not a second
 // animation restarting from rest.
 function updateTransition(delta) {
-  if (!transition) return;
+  if (!transition) return false;
 
   transition.t += delta / TRANSITION_SECONDS;
   const rawT = Math.min(transition.t, 1);
   const t = easeInOutCubic(rawT);
+  const orthoCam = titleScreen.camera;
+  let orthoActive;
+
+  if (transition.reverse) {
+    // Home: perspective drives the FIRST leg (rawT < handoffT), ortho drives
+    // the LAST leg - the mirror image of a normal flight's ortho-first order.
+    const easedHandoffT = easeInOutCubic(transition.handoffT);
+
+    if (rawT < transition.handoffT) {
+      orthoActive = false;
+      camera.position.lerpVectors(transition.fromPos, transition.toPos, t);
+      camera.quaternion.slerpQuaternions(transition.fromQuat, transition.toQuat, t);
+      // FOV narrows from the normal walking FOV toward the computed
+      // handoff FOV as we approach the switch - opposite direction from a
+      // forward flight's perspective leg (which widens toward 45).
+      camera.fov = THREE.MathUtils.lerp(transition.fromFov, transition.handoffFov, t / easedHandoffT);
+      camera.updateProjectionMatrix();
+    } else {
+      orthoActive = true;
+      if (!transition.switched) {
+        // One-time handoff - seed orthoCam at exactly the pose/zoom the
+        // continuous curve says it should be at right now, so there's no
+        // pop when the render camera switches from perspective to ortho.
+        transition.switched = true;
+        orthoCam.zoom = ORTHO_ZOOM_END;
+      }
+      orthoCam.position.lerpVectors(transition.fromPos, transition.toPos, t);
+      orthoCam.quaternion.slerpQuaternions(transition.fromQuat, transition.toQuat, t);
+      // Zoom ramps back OUT, ORTHO_ZOOM_END -> 1, arriving at the normal
+      // (unzoomed) title framing exactly as rawT reaches 1.
+      const zoomT = (t - easedHandoffT) / (1 - easedHandoffT);
+      orthoCam.zoom = THREE.MathUtils.lerp(ORTHO_ZOOM_END, 1, THREE.MathUtils.clamp(zoomT, 0, 1));
+      orthoCam.updateProjectionMatrix();
+    }
+
+    if (rawT >= 1) {
+      transition = null;
+      finishReturnToTitle();
+    }
+    return orthoActive;
+  }
 
   if (transition.hasOrthoPhase && rawT < transition.handoffT) {
-    const orthoCam = titleScreen.camera;
+    orthoActive = true;
     const easedHandoffT = easeInOutCubic(transition.handoffT);
     orthoCam.position.lerpVectors(transition.fromPos, transition.toPos, t);
     orthoCam.quaternion.slerpQuaternions(transition.fromQuat, transition.toQuat, t);
@@ -409,14 +516,15 @@ function updateTransition(delta) {
     orthoCam.zoom = THREE.MathUtils.lerp(1, ORTHO_ZOOM_END, t / easedHandoffT);
     orthoCam.updateProjectionMatrix();
   } else {
+    orthoActive = false;
     if (transition.hasOrthoPhase && !transition.switched) {
       // One-time handoff - seed the perspective camera at exactly the pose
       // the continuous curve says it should be at right now, so there's no
       // pop at the switch (it just continues the same motion, on a
       // different camera object).
       transition.switched = true;
-      titleScreen.camera.zoom = 1; // reset for next time (titleScreen gets rebuilt fresh if ever re-entered anyway)
-      titleScreen.camera.updateProjectionMatrix();
+      orthoCam.zoom = 1; // reset for next time
+      orthoCam.updateProjectionMatrix();
     }
 
     camera.position.lerpVectors(transition.fromPos, transition.toPos, t);
@@ -438,6 +546,29 @@ function updateTransition(delta) {
     controls.locked = false; // hand control back to WASD/drag-look, camera is already exactly at the spawn pose
     activateExploreNavIfApplicable(finishedRoute);
   }
+  return orthoActive;
+}
+
+// Runs once a reverse (Home) flight's t hits 1 - full mirror-image of what
+// startTransition() sets up when entering walk mode: mode flips back to
+// 'title', walk-mode UI hides, title-mode UI (menu list, social links)
+// reappears, and controls/vinylInteraction are torn down via their real
+// dispose() methods (not just dropped) so their window/document-level
+// listeners don't pile up if you go home and re-enter several times.
+function finishReturnToTitle() {
+  mode = 'title';
+
+  controls?.dispose();
+  controls = null;
+  vinylInteraction?.dispose();
+  vinylInteraction = null;
+
+  titleScreen.rebind();
+
+  mainMenuListEl?.classList.remove('collapsed');
+  document.getElementById('menu-home-item')?.classList.add('hidden');
+  socialLinksEl?.classList.remove('hidden');
+  if (debugPosEl) debugPosEl.style.display = 'none';
 }
 
 // Corner nav overlay (PORTFOLIO / EXPLORE / CONTACT / ABOUT) - separate
@@ -478,18 +609,14 @@ document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
   li.addEventListener('click', () => {
     const route = li.dataset.route;
 
-    // Home - goes all the way back to the title screen's main menu, not
-    // just to the spawn spot inside walk mode. This app's mode/Controls/
-    // VinylInteraction/TitleScreen wiring is built one-way (title -> walk,
-    // once) - Controls' constructor attaches its own window/document-level
-    // listeners (drag-look, WASD, touch) with no matching teardown, so
-    // constructing a second one to fly "back" into walk mode later would
-    // stack duplicate input handlers rather than cleanly replacing the
-    // first. A full reload is the reliable way to land back on a genuinely
-    // fresh title screen without that risk - it's a heavier reset than an
-    // in-place camera flight, but correct every time.
+    // Home - reverses the title->walk flight back to the exact original
+    // title framing (see startReturnToTitle/finishReturnToTitle above),
+    // rather than a page reload. Controls.dispose()/VinylInteraction.dispose()
+    // are what make this safe to do repeatedly - without them, each round
+    // trip would leave a stacked-up set of orphaned window/document-level
+    // input listeners behind.
     if (route === 'home') {
-      window.location.reload();
+      startReturnToTitle();
       return;
     }
 
@@ -613,22 +740,20 @@ function tick() {
     // "that fog thing." Only switches back to the real fog once
     // `transition` clears (flight actually finished).
     scene.fog = transition ? null : streetFog;
-    updateTransition(delta); // no-ops once the title->walk flight finishes, see startTransition() above
-    controls.update(delta); // no-ops itself while controls.locked (mid-flight, or vinylInteraction's lock)
+    // updateTransition() returns whether titleScreen.camera should render
+    // THIS frame - read directly from the return value rather than
+    // inspecting `transition` afterward, since a Home flight that finishes
+    // on this exact frame nulls `transition` (and mode/controls along with
+    // it, via finishReturnToTitle) before returning, which would otherwise
+    // make the very last frame of the flight render with the WRONG camera.
+    const orthoActive = updateTransition(delta);
+    controls?.update(delta); // null for one frame if a Home flight just finished above - no-ops itself while locked either way
     vinylInteraction?.update(delta); // no-ops unless a lock-in/out transition is in progress
     updateExploreNavVisibility(); // hides the </> arrows the moment you move away from an Explore spot
     updatePositionDebug();
 
-    // Still-orthographic portion of the title->walk flight (see the big
-    // comment above `transition`) renders through titleScreen.camera, same
-    // as actual title mode does below - everything about how that camera
-    // gets treated (tilt-shift on) carries over for as long as we're still
-    // using it. Checked AFTER updateTransition() runs above so the one frame
-    // the handoff actually happens on picks the perspective camera (already
-    // freshly seeded that same frame), not a stale one-frame-late ortho read.
-    const inOrthoPhase = !!transition && transition.hasOrthoPhase && !transition.switched;
-    post.tiltShiftPass.enabled = inOrthoPhase;
-    post.renderPass.camera = inOrthoPhase ? titleScreen.camera : camera;
+    post.tiltShiftPass.enabled = orthoActive;
+    post.renderPass.camera = orthoActive ? titleScreen.camera : camera;
   } else {
     scene.fog = null;
     post.tiltShiftPass.enabled = true;

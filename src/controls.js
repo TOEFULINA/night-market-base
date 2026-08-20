@@ -135,6 +135,17 @@ export class Controls {
     }
   }
 
+  // Listener callbacks are stored on `this` (not left as inline anonymous
+  // functions like before) so dispose() below can actually remove them.
+  // This matters now that Home reverses back to the title screen instead of
+  // reloading the page (see main.js's startReturnToTitle) - a fresh Controls
+  // instance gets constructed every time you re-enter walk mode, and without
+  // a real dispose() each round trip would leave a whole extra set of
+  // window/document-level mousemove/mouseup/blur/keydown/keyup listeners
+  // behind, permanently - each still harmlessly updating that ORPHANED
+  // instance's own this.yaw/this.move (never read again since `controls` in
+  // main.js points at the newest instance), but that's a real, unbounded
+  // listener leak over repeated home/re-enter cycles, not just a style nit.
   _setupDesktop() {
     const overlay = document.getElementById('intro-overlay');
     overlay.classList.add('visible');
@@ -146,13 +157,13 @@ export class Controls {
     let lastX = 0;
     let lastY = 0;
 
-    this.domElement.addEventListener('mousedown', (e) => {
+    this._onMouseDown = (e) => {
       if (e.button !== 0) return; // left-click drag only
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
-    });
-    window.addEventListener('mousemove', (e) => {
+    };
+    this._onWindowMouseMove = (e) => {
       if (!dragging) return;
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
@@ -160,10 +171,15 @@ export class Controls {
       lastY = e.clientY;
       this.yaw -= dx * LOOK_SENSITIVITY;
       this.pitch = THREE.MathUtils.clamp(this.pitch - dy * LOOK_SENSITIVITY, -1.2, 1.2);
-    });
-    window.addEventListener('mouseup', () => { dragging = false; });
+    };
+    this._onWindowMouseUp = () => { dragging = false; };
     // dragged off-window mid-drag - stop rather than leaving it "stuck"
-    window.addEventListener('blur', () => { dragging = false; });
+    this._onWindowBlur = () => { dragging = false; };
+
+    this.domElement.addEventListener('mousedown', this._onMouseDown);
+    window.addEventListener('mousemove', this._onWindowMouseMove);
+    window.addEventListener('mouseup', this._onWindowMouseUp);
+    window.addEventListener('blur', this._onWindowBlur);
 
     const onKey = (down) => (e) => {
       switch (e.code) {
@@ -174,8 +190,10 @@ export class Controls {
         case 'ShiftLeft': case 'ShiftRight': this.move.run = down; break;
       }
     };
-    document.addEventListener('keydown', onKey(true));
-    document.addEventListener('keyup', onKey(false));
+    this._onKeyDown = onKey(true);
+    this._onKeyUp = onKey(false);
+    document.addEventListener('keydown', this._onKeyDown);
+    document.addEventListener('keyup', this._onKeyUp);
   }
 
   _setupTouch() {
@@ -187,14 +205,15 @@ export class Controls {
     // --- virtual joystick (movement) ---
     const zone = document.getElementById('joystick-zone');
     const knob = document.getElementById('joystick-knob');
+    this._zone = zone;
     let joyTouchId = null;
     const joyVec = { x: 0, y: 0 };
 
-    zone.addEventListener('touchstart', (e) => {
+    this._onZoneTouchStart = (e) => {
       const t = e.changedTouches[0];
       joyTouchId = t.identifier;
-    });
-    zone.addEventListener('touchmove', (e) => {
+    };
+    this._onZoneTouchMove = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier !== joyTouchId) continue;
         const rect = zone.getBoundingClientRect();
@@ -210,8 +229,8 @@ export class Controls {
         knob.style.transform = `translate(${joyVec.x * max}px, ${joyVec.y * max}px)`;
       }
       e.preventDefault();
-    }, { passive: false });
-    const resetJoy = (e) => {
+    };
+    this._onZoneReset = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier !== joyTouchId) continue;
         joyTouchId = null;
@@ -219,23 +238,25 @@ export class Controls {
         knob.style.transform = 'translate(0px, 0px)';
       }
     };
-    zone.addEventListener('touchend', resetJoy);
-    zone.addEventListener('touchcancel', resetJoy);
+    zone.addEventListener('touchstart', this._onZoneTouchStart);
+    zone.addEventListener('touchmove', this._onZoneTouchMove, { passive: false });
+    zone.addEventListener('touchend', this._onZoneReset);
+    zone.addEventListener('touchcancel', this._onZoneReset);
     this._joyVec = joyVec;
 
     // --- drag anywhere else on screen to look around ---
     let lookTouchId = null;
     let lastX = 0, lastY = 0;
 
-    this.domElement.addEventListener('touchstart', (e) => {
+    this._onDomTouchStart = (e) => {
       for (const t of e.changedTouches) {
         if (zone.contains(t.target)) continue; // joystick handles its own touch
         if (lookTouchId !== null) continue;
         lookTouchId = t.identifier;
         lastX = t.clientX; lastY = t.clientY;
       }
-    });
-    this.domElement.addEventListener('touchmove', (e) => {
+    };
+    this._onDomTouchMove = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier !== lookTouchId) continue;
         const dx = t.clientX - lastX;
@@ -244,14 +265,41 @@ export class Controls {
         this.yaw -= dx * LOOK_SENSITIVITY;
         this.pitch = THREE.MathUtils.clamp(this.pitch - dy * LOOK_SENSITIVITY, -1.2, 1.2);
       }
-    }, { passive: true });
-    const resetLook = (e) => {
+    };
+    this._onDomTouchReset = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === lookTouchId) lookTouchId = null;
       }
     };
-    this.domElement.addEventListener('touchend', resetLook);
-    this.domElement.addEventListener('touchcancel', resetLook);
+    this.domElement.addEventListener('touchstart', this._onDomTouchStart);
+    this.domElement.addEventListener('touchmove', this._onDomTouchMove, { passive: true });
+    this.domElement.addEventListener('touchend', this._onDomTouchReset);
+    this.domElement.addEventListener('touchcancel', this._onDomTouchReset);
+  }
+
+  // Removes every listener added in _setupDesktop/_setupTouch. Call before
+  // dropping a Controls instance (see main.js's startReturnToTitle) - without
+  // this, every walk-mode session leaves its window/document-level listeners
+  // behind forever since a brand new Controls gets constructed each time you
+  // re-enter walk mode.
+  dispose() {
+    if (this.isMobile) {
+      this._zone?.removeEventListener('touchstart', this._onZoneTouchStart);
+      this._zone?.removeEventListener('touchmove', this._onZoneTouchMove);
+      this._zone?.removeEventListener('touchend', this._onZoneReset);
+      this._zone?.removeEventListener('touchcancel', this._onZoneReset);
+      this.domElement.removeEventListener('touchstart', this._onDomTouchStart);
+      this.domElement.removeEventListener('touchmove', this._onDomTouchMove);
+      this.domElement.removeEventListener('touchend', this._onDomTouchReset);
+      this.domElement.removeEventListener('touchcancel', this._onDomTouchReset);
+    } else {
+      this.domElement.removeEventListener('mousedown', this._onMouseDown);
+      window.removeEventListener('mousemove', this._onWindowMouseMove);
+      window.removeEventListener('mouseup', this._onWindowMouseUp);
+      window.removeEventListener('blur', this._onWindowBlur);
+      document.removeEventListener('keydown', this._onKeyDown);
+      document.removeEventListener('keyup', this._onKeyUp);
+    }
   }
 
   update(delta) {

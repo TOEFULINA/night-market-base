@@ -329,4 +329,16 @@ export class TitleScreen {
     this.renderer.domElement.removeEventListener('click', this._onClick);
     this.renderer.domElement.style.cursor = '';
   }
+
+  // Re-adds the listeners dispose() removed - for when Home (main.js's
+  // startReturnToTitle) reverses back to the title screen instead of a full
+  // page reload. _onPointerMove/_onClick are still the same bound function
+  // references from the constructor (dispose only removes them, doesn't
+  // null them out), so this is just addEventListener again - safe to call
+  // even if already bound since DOM listeners de-dupe identical
+  // type+listener pairs automatically.
+  rebind() {
+    this.renderer.domElement.addEventListener('pointermove', this._onPointerMove);
+    this.renderer.domElement.addEventListener('click', this._onClick);
+  }
 }

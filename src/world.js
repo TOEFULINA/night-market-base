@@ -339,10 +339,18 @@ const WORLD_SIZE = 60;
 //  - lowitem2 - different shape (reused across 26 separate "Box111xx"
 //    nodes rather than one multi-face object), but you grouped it with
 //    the others so treating it the same way.
+// Re-verified directly against TRY5_SCENE.glb (not carried over blind) -
+// 3 of the original 6 no longer exist there (Material_#5389,
+// Material_#1111223370, lowitem2 - same kind of churn as the TRY2->TRY4
+// transition's "hanger material" loss noted below). The remaining 3 still
+// resolve under the exact same names. If something that used to look
+// dynamically-lit now reads flat/baked, one of the 3 dropped ones is the
+// likely cause - check what material TRY5's Box2508/Plane433 nodes (and the
+// 26 "Box111xx" nodes that used lowitem2) carry now and add it back here
+// under its new name if still needed.
 const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
   'RecordStoreWallsMaterial.002',
-  'Material_#1111223369_2', 'Material_#5389', 'Material_#1111223370',
-  'Material_#5366', 'lowitem2',
+  'Material_#1111223369_2', 'Material_#5366',
 ]);
 
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
@@ -362,22 +370,30 @@ const STREET_LOADING_TOKEN = 'street-scene-full-load';
 async function addStreetScene(scene) {
   loadingManager.itemStart(STREET_LOADING_TOKEN);
   try {
-    // TRY4_SCENE.glb - latest baking/cleanup pass, replacing TRY2_SCENE.glb.
-    // Draco-compressed (1046/1046 primitives), 334 materials / 912 meshes -
-    // down again from TRY2's 1292 meshes (990 nodes total now vs TRY2's
-    // 1355) - more merge-by-material work paying off. Raw upload was
-    // 756.8MB (753.1MB of it images) - same 1536px/JPEG-q80 treatment as
-    // TRY2 (this scene has a lot of up-close legible content - album art,
-    // price tags, posters, clothing graphics - that the project's usual
-    // 512px blanket turns to mush), landing at 90.7MB. Continuity with the
-    // prior file verified directly, not assumed: landmark nodes Object040
-    // and Rack come out at the exact same world-space position in both
-    // files (full transform-hierarchy walk), and every material name this
-    // code references by name (below) was individually re-checked against
-    // this file rather than carried over blind - see the note above
-    // LIT_EXCEPTION_MATERIAL_NAMES for the one that didn't survive
-    // (the hanger material).
-    const { scene: street } = await loadModel('/models/TRY4_SCENE.glb');
+    // TRY5_SCENE.glb - latest full-scene pass, replacing TRY4_SCENE.glb.
+    // Source upload: 921_WEB_OPTIMIZED_FINALSAVE_allbaked.glb, 647MB raw
+    // (644MB of it images across 546 textures), Draco-compressed already
+    // (721 nodes / 643 meshes / 337 materials). Continuity with TRY4
+    // verified directly, not assumed: every name this codebase references -
+    // all 17 MENU_SIGN_NODE_NAMES (titleScreen.js), all 14
+    // THRIFT_SIMPLE_SWAP_NODE_NAMES, all 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,
+    // plus the crates/glass-building/cover-supply landmark nodes - resolves
+    // to a real object under the exact same name in this file. Given that
+    // exact-name continuity plus the "FINALSAVE"/"allbaked" filename, the
+    // five per-room rebake overlays (vinyl/thrift/crates/glass/cover-supply)
+    // are DISABLED below rather than re-applied on top - see the long
+    // comment at their old Promise.all call site for the reasoning.
+    //
+    // Standard 1536px-cap/JPEG-q80 texture treatment applied scene-wide
+    // (same as TRY4), landing at 145MB - bigger than TRY4's 90.7MB almost
+    // entirely because of explicit HD exceptions per your ask: the vinyl
+    // store wall/floor bake (RecordStoreWallsMaterial.002) and "the vinyl"
+    // records material (VynylMaterial.004) both got a 3072px cap instead of
+    // 1536, AND their normal maps were kept as lossless PNG rather than
+    // JPEG (JPEG's block/chroma artifacts visibly corrupt normal-encoded
+    // surface direction - not an acceptable tradeoff for "keep this good").
+    // Thrift store clothing/shoe items also got the 3072px HD treatment.
+    const { scene: street } = await loadModel('/models/TRY5_SCENE.glb');
 
     // Baked/unlit by DEFAULT now - only LIT_EXCEPTION_MATERIAL_NAMES above
     // (just the record-store wall's normal map at this point - see the note
@@ -466,44 +482,31 @@ async function addStreetScene(scene) {
     // materials before the swap. Order doesn't matter between them (each
     // touches a disjoint set of nodes), so there's no correctness reason
     // they needed to be sequential in the first place.
-    await Promise.all([
-      addCoverSupplySignSwap(street),
-      // Two-crate rebake (CRATES_REBAKE.glb) - same pattern as the sign
-      // above: the two nodes it contains (B_Daily_R_VR_N_JP_Basket_0003/0004)
-      // already exist in TRY4_SCENE.glb under the exact same names,
-      // positions, AND material names (I_Basket_0001_Green_Co_0001.001/.003)
-      // - confirmed directly, not assumed. Straight geometry+material swap
-      // on the matching existing nodes. Both materials use alphaMode BLEND
-      // with real normal/specular maps in the new export (not flat
-      // placeholders), so this one keeps its full material rather than just
-      // swapping a texture onto a MeshBasicMaterial - still goes through
-      // toUnlitFlat like everything else not on the lit-exception list,
-      // since it's not named there.
-      addCratesRebake(street),
-      // Glass outer building rebake (GLASS_BUILDING_REBAKE.glb) - single
-      // node (Box1801, material Material_#1111224967), confirmed directly:
-      // exists under the exact same name/material in TRY4_SCENE.glb at
-      // (-10.93, 0, 11.49), and that material is used by exactly this one
-      // node (not a shared/generic slot). Straightforward geometry+material
-      // swap, same pattern as the crates above - see addGlassBuildingSwap
-      // for the one wrinkle (forced transparency).
-      addGlassBuildingSwap(street),
-      // Thrift store clothing rebake (THRIFT_REBAKE.glb) - see
-      // addThriftRebake below for the full writeup. Two different swap
-      // patterns in one file: most items are straightforward node-name
-      // matches like the crates above, but three clothing-pile nodes needed
-      // material-name matching instead, since Blender exported those
-      // unmerged this round. This is also by far the biggest of the four
-      // (24MB) - it alone used to set the floor on how long the whole
-      // sequential chain took, so it benefits the most from running
-      // alongside the others instead of after them.
-      addThriftRebake(street),
-      // Vinyl/record store room rebake (VINYL_STORE_REBAKE.glb, "new vinyl
-      // store bakes") - see addVinylStoreRebake below for the full writeup.
-      // By far the biggest upload yet (423MB raw), so it benefits the most
-      // from running alongside the others instead of after them.
-      addVinylStoreRebake(street),
-    ]);
+    // All five of these per-room rebake overlays (addCoverSupplySignSwap/
+    // addCratesRebake/addGlassBuildingSwap/addThriftRebake/
+    // addVinylStoreRebake) are DISABLED as of TRY5_SCENE.glb, not deleted -
+    // same "unwire don't delete" pattern as companion.js/npc.js elsewhere in
+    // this project. Reasoning: TRY5 (source upload
+    // 921_WEB_OPTIMIZED_FINALSAVE_allbaked.glb) already contains every node
+    // these five functions target, under the exact same names, positions,
+    // and material names as before - verified directly (all 54 vinyl-store
+    // names, 14 thrift names, plus the cover-supply/crates/glass-building
+    // landmark nodes all resolve). The filename itself ("FINALSAVE",
+    // "allbaked") plus that exact-name continuity strongly suggests this
+    // export already IS the up-to-date, finalized version of those rooms -
+    // re-applying the older separately-uploaded rebake files on top would
+    // risk overwriting TRY5's own current bakes with stale ones rather than
+    // improving anything. If any specific room turns out to look wrong (an
+    // old/different bake than expected), the fix is to re-enable just that
+    // one call below rather than assuming all five need to come back.
+    //
+    // await Promise.all([
+    //   addCoverSupplySignSwap(street),
+    //   addCratesRebake(street),
+    //   addGlassBuildingSwap(street),
+    //   addThriftRebake(street),
+    //   addVinylStoreRebake(street),
+    // ]);
 
     // (windows swap - addBlackGlassWindows - already ran above, before
     // scene.add, since it doesn't need to wait on anything)
@@ -534,10 +537,13 @@ async function addStreetScene(scene) {
     streetSceneStatus.detail =
       `meshes:${meshCount} size:${size.x.toFixed(0)}x${size.y.toFixed(0)}x${size.z.toFixed(0)} ` +
       `rawCenterY:${center.y.toFixed(0)} finalPosY:${street.position.y.toFixed(0)}\n` +
-      `vinyl: simple ${vinylRebakeStatus.simpleOk}/${VINYL_STORE_SIMPLE_SWAP_NODE_NAMES.length} ` +
-      `multi ${vinylRebakeStatus.multiOk}/${VINYL_STORE_MULTI_PRIMITIVE_REPLACE_NAMES.length} ` +
-      `add ${vinylRebakeStatus.addOk}/${VINYL_STORE_ADD_NODES.length}` +
-      (vinylRebakeStatus.loadError ? ` LOAD FAILED: ${vinylRebakeStatus.loadError}` : '');
+      // Per-room rebake overlays (vinyl/thrift/crates/glass/cover-supply) are
+      // disabled as of TRY5_SCENE.glb - see the long comment at the old
+      // Promise.all call site above for why. This used to show live
+      // simple/multi/add counts for the vinyl rebake specifically; leaving
+      // that stat out now rather than showing permanent 0/0s, which would
+      // read as a failure instead of "intentionally not running."
+      `rebakes: disabled (TRY5 has these baked in already)`;
   } catch (err) {
     console.error('[street scene] failed to load TRY2_SCENE.glb:', err);
     streetSceneStatus.state = 'error';

@@ -104,15 +104,20 @@ const FRAME_CENTER_X_OFFSET = 2;
 // getting a real anchor point instead of iterating on this blind.
 const CAMERA_CORNER = new THREE.Vector2(-1, -1);
 
-// Very subtle mouse-parallax, "like the Apple wallpaper depth effect" - a
-// tiny eased offset applied to the look-at target (NOT the camera position -
-// see the long comment on TitleScreen.update() below for why a rotation was
-// the right call here, not a translation) along the camera's own screen-
-// right/screen-up axes as the pointer moves. Kept deliberately small (a
-// fraction of a unit against a ~20-unit-tall frustum, at ~60+ units of
-// look-at distance that's a well-under-1-degree tilt) per "barely any" -
-// this should be felt more than seen.
-const PARALLAX_STRENGTH = 0.35; // max look-at target shift (world units) at pointer extremes
+// Mouse-parallax, "like the Apple wallpaper depth effect" - a tiny eased
+// offset applied to the look-at target (NOT the camera position - see the
+// long comment on TitleScreen.update() below for why a rotation was the
+// right call here, not a translation) along the camera's own screen-right/
+// screen-up axes as the pointer moves.
+//
+// "make the title screen parallax more noticeable" - was 0.35, tuned back
+// then per "barely any"/"felt more than seen." Bumped to 1.0 (~3x the
+// shift) - at the ~60+ unit look-at distance that's still under a 1-degree
+// tilt, so it stays a depth cue rather than a swing, just a clearly visible
+// one now instead of near-subliminal. Eased half-life left alone (0.15s)
+// since that's response SPEED, not amount - "more noticeable" was about
+// the offset being too small, not too slow to catch up.
+const PARALLAX_STRENGTH = 1.0; // max look-at target shift (world units) at pointer extremes
 const PARALLAX_EASE_HALF_LIFE = 0.15; // seconds to close ~half the remaining gap to the target offset
 
 function buildingCenter() {

@@ -424,11 +424,31 @@ async function addStreetScene(scene) {
     // rather than JPEG (JPEG's block/chroma artifacts visibly corrupt
     // normal-encoded surface direction - not an acceptable tradeoff for
     // "keep this good"). Thrift store clothing/shoe items also got the
-    // 3072px HD treatment. The new ground/wall/building textures got the
-    // standard tier - none of them were called out as needing HD, and the
-    // BG building's own base-color bake got its own separate lossless-no-
-    // blur treatment (see the merge note further down) since that one's a
-    // finished asset of yours, not raw source to recompress hard.
+    // 3072px HD treatment. The BG building's own base-color bake got its
+    // own separate lossless-no-blur treatment (see the merge note further
+    // down) since that one's a finished asset of yours, not raw source to
+    // recompress hard. The new ground plane's texture is standard tier.
+    //
+    // The wall+building's texture (Material.006, Plane.003) is now a
+    // second lossless exception, patched in after the fact per "uncompress
+    // that new building plane image and remove the emission": it had
+    // originally gone through the standard 1536px/JPEG-q80 tier same as
+    // everything else uncalled-out, but got re-extracted at its full native
+    // resolution (6336x2688, lossless PNG, no resize) instead. Also dropped
+    // that material's emissiveTexture/emissiveFactor/KHR_materials_emissive_strength
+    // entirely - it was pointing the SAME texture back in as emissive with
+    // strength 3.4, which would've bloomed the whole wall/building.
+    //
+    // Texture swapped again right after per "i dont want the sky in the
+    // image" - the original bake had its sky as flat opaque black (RGB,
+    // no alpha channel), so the plane always showed a hard black rectangle
+    // behind the buildings instead of blending into the scene's actual fog/
+    // background. Your "buildings.png" upload is the same shot with a real
+    // alpha channel this time (checked directly: 73% fully opaque, 26%
+    // fully transparent, ~1% soft antialiased edge pixels - a clean cutout,
+    // not a painted blend), so the material picked up alphaMode BLEND to
+    // keep those soft edges instead of snapping to a hard cutoff, same
+    // treatment as every other real-alpha texture in this project.
     const { scene: street } = await loadModel('/models/TRY6_SCENE.glb');
 
     // Baked/unlit by DEFAULT now - only LIT_EXCEPTION_MATERIAL_NAMES above

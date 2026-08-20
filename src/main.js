@@ -180,6 +180,25 @@ const LOCATIONS = {
 // to LOCATIONS above, it'll start showing up in the cycle automatically.
 const EXPLORE_ROUTE_ORDER = ['explore-archive-shop', 'explore-records', 'explore-prints-figures', 'explore-packaging'];
 
+// "the transition between the archive and vinyl store goes through the
+// wall" - there's no real wall collision anywhere in this project
+// (controls.js is explicit about that: just a world-radius/X_MAX/Z_MIN
+// clamp, no per-wall geometry), and flyToLocation below has always done a
+// straight two-point lerp with controls locked - completely blind to
+// anything in between. Between these two specific spots that straight line
+// cuts across a wall. Not a general nav-mesh fix (that's the "reverted,
+// came out broken" Octree/Capsule road controls.js already warns off of) -
+// just a manual bend point for this one pair, taken directly from the
+// route you walked in the screen recording (debug overlay read a steady
+// x:-6.05 the whole second half, from z:-18.9 up to z:-14.64) - going
+// through roughly (-6.05, -18.9) instead of cutting straight from one spot
+// to the other keeps the flight on the same side of the wall the whole
+// way. Keyed both directions since flyToLocation runs from either end.
+const ROUTE_WAYPOINTS = {
+  'explore-archive-shop|explore-records': [{ x: -6.05, y: 1.3, z: -18.9 }],
+  'explore-records|explore-archive-shop': [{ x: -6.05, y: 1.3, z: -18.9 }],
+};
+
 // --- Title -> walk camera transition ------------------------------------
 // "pan out from orthographic... dynamically moving to the walk point
 // fluidly, not just a direct cut." Two phases now, not one - see your call
@@ -370,7 +389,7 @@ function startTransition(routeKey) {
 // everything that's title-screen-specific (no FOV matching needed -
 // already at the normal walking FOV, no menu/dispose cleanup). Only usable
 // once already in walk mode and not already mid-flight, hence the guards.
-function flyToLocation(routeKey) {
+function flyToLocation(routeKey, fromRouteKey) {
   if (mode !== 'walk' || transition || !controls) return;
   const location = LOCATIONS[routeKey];
   if (!location) return;
@@ -389,6 +408,14 @@ function flyToLocation(routeKey) {
   controls.pitch = 0;
   const toQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, toYaw, 0, 'YXZ'));
 
+  // See ROUTE_WAYPOINTS above - most pairs have no entry and fly straight
+  // (unchanged behavior), a couple of specific pairs bend through a manual
+  // point instead of cutting through a wall. fromRouteKey is only passed by
+  // the </> Explore-nav arrows (the only caller that reliably knows which
+  // spot it's leaving FROM) - falls back to a plain 2-point path otherwise.
+  const bend = fromRouteKey && ROUTE_WAYPOINTS[`${fromRouteKey}|${routeKey}`];
+  const pathPoints = [fromPos, ...(bend ? bend.map((p) => new THREE.Vector3(p.x, p.y, p.z)) : []), toPos];
+
   // Already in perspective (mid-walk, not coming from the title's ortho
   // camera) - no ortho phase at all, just a single continuous lerp/slerp/fov
   // blend the whole way, same shared field names/logic updateTransition uses
@@ -399,7 +426,34 @@ function flyToLocation(routeKey) {
     toPos, toQuat, toFov: fromFov,
     hasOrthoPhase: false,
     routeKey,
+    pathPoints: pathPoints.length > 2 ? pathPoints : null,
   };
+}
+
+// Piecewise-linear position along pathPoints at eased-progress t (0-1),
+// parameterized by cumulative segment DISTANCE rather than point count - so
+// a short bend segment doesn't get the same time-share as a long straight
+// one, which would read as a speed hitch. Only used when a transition
+// actually has a bend (see ROUTE_WAYPOINTS/flyToLocation above); the plain
+// 2-point case in updateTransition skips this entirely.
+function positionAlongPath(pathPoints, t) {
+  let total = 0;
+  const segLengths = [];
+  for (let i = 0; i < pathPoints.length - 1; i++) {
+    const d = pathPoints[i].distanceTo(pathPoints[i + 1]);
+    segLengths.push(d);
+    total += d;
+  }
+  if (total === 0) return pathPoints[0].clone();
+  let remaining = t * total;
+  for (let i = 0; i < segLengths.length; i++) {
+    if (remaining <= segLengths[i] || i === segLengths.length - 1) {
+      const segT = segLengths[i] === 0 ? 0 : THREE.MathUtils.clamp(remaining / segLengths[i], 0, 1);
+      return pathPoints[i].clone().lerp(pathPoints[i + 1], segT);
+    }
+    remaining -= segLengths[i];
+  }
+  return pathPoints[pathPoints.length - 1].clone();
 }
 
 // Home (walk -> title) - the literal time-reverse of startTransition's
@@ -589,7 +643,11 @@ function updateTransition(delta) {
       orthoCam.updateProjectionMatrix();
     }
 
-    camera.position.lerpVectors(transition.fromPos, transition.toPos, t);
+    if (transition.pathPoints) {
+      camera.position.copy(positionAlongPath(transition.pathPoints, t));
+    } else {
+      camera.position.lerpVectors(transition.fromPos, transition.toPos, t);
+    }
     camera.quaternion.slerpQuaternions(transition.fromQuat, transition.toQuat, t);
 
     if (transition.hasOrthoPhase) {
@@ -734,12 +792,12 @@ const exploreNavEl = document.getElementById('explore-nav');
 document.getElementById('explore-nav-prev')?.addEventListener('click', () => {
   if (currentExploreIndex === -1) return;
   const adjacent = findAdjacentExploreRoute(currentExploreIndex, -1);
-  if (adjacent) flyToLocation(adjacent.route);
+  if (adjacent) flyToLocation(adjacent.route, EXPLORE_ROUTE_ORDER[currentExploreIndex]);
 });
 document.getElementById('explore-nav-next')?.addEventListener('click', () => {
   if (currentExploreIndex === -1) return;
   const adjacent = findAdjacentExploreRoute(currentExploreIndex, 1);
-  if (adjacent) flyToLocation(adjacent.route);
+  if (adjacent) flyToLocation(adjacent.route, EXPLORE_ROUTE_ORDER[currentExploreIndex]);
 });
 
 // Bloom pass - see postprocessing.js for the why. Constructed with the

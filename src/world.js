@@ -500,6 +500,24 @@ async function addStreetScene(scene) {
     // file directly. Standard tier, already 1024 with real alpha, no
     // resize needed.
     //
+    // Turned out the combocrates swap above wasn't actually the fix (the
+    // "correct" combocrates.png you posted was pixel-IDENTICAL to what
+    // bakedvinylnewtextures.glb already had embedded - checked directly,
+    // not assumed - so that whole texture was a red herring). The real bug:
+    // "fucking please.glb" wasn't just new materials, it had different
+    // GEOMETRY for Box03/PlasticCrate03/04/05/06 too ("combined and
+    // separated from the base mesh" - confirmed by reading the accessors
+    // directly, different vertex counts than what TRY7 had). Patching just
+    // the material left the OLD geometry's UVs pointing at the wrong part
+    // of the new texture atlas - that's what the solid-black crate in your
+    // screenshot was (UVs sampling the atlas's unused black space, not a
+    // missing/broken texture). Fix: full mesh transplant, not a material
+    // patch - copied the actual Draco-compressed primitive data (bufferView
+    // + accessors) for all 5 nodes straight out of "fucking please.glb"
+    // and swapped each node's mesh index outright, materials pointed at
+    // the same already-correct TRY7 materials (341/342/281), node
+    // transforms copied verbatim from the upload too.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

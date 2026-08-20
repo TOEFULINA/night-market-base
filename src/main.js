@@ -791,15 +791,30 @@ const socialLinksEl = document.getElementById('social-links');
 // above for the actual cycling logic. Buttons themselves stay in the DOM at
 // all times; #explore-nav's .hidden class (toggled by show/hideExploreNav)
 // is what controls visibility.
+//
+// "arrows should align with the physical direction" - the < button now
+// steps FORWARD through EXPLORE_ROUTE_ORDER (+1) and > steps BACKWARD (-1),
+// the opposite of what their glyphs/DOM order would suggest on their own.
+// That's intentional, not a typo: EXPLORE_ROUTE_ORDER is sorted by
+// ascending LOCATIONS.x (records -5.61 -> archive -2.74 -> prints 3.66 ->
+// packaging 10.25, left to right in world space), but the camera at each
+// spot is turned to roughly FACE the wall/shelf it's framing rather than
+// facing down that x-axis - so walking toward a higher-x neighbor reads as
+// stepping to your on-screen LEFT from inside that facing, not your right.
+// Swapping the bindings (rather than reversing EXPLORE_ROUTE_ORDER itself,
+// which would undo the "records, archive, prints, packaging" menu order
+// just set to match the horizontal layout) keeps the dropdown/menu order
+// and the arrow behavior each matching their own separate "what feels
+// right" - the menu list top-to-bottom, the arrows on-screen left/right.
 const exploreNavEl = document.getElementById('explore-nav');
 document.getElementById('explore-nav-prev')?.addEventListener('click', () => {
   if (currentExploreIndex === -1) return;
-  const adjacent = findAdjacentExploreRoute(currentExploreIndex, -1);
+  const adjacent = findAdjacentExploreRoute(currentExploreIndex, 1);
   if (adjacent) flyToLocation(adjacent.route, EXPLORE_ROUTE_ORDER[currentExploreIndex]);
 });
 document.getElementById('explore-nav-next')?.addEventListener('click', () => {
   if (currentExploreIndex === -1) return;
-  const adjacent = findAdjacentExploreRoute(currentExploreIndex, 1);
+  const adjacent = findAdjacentExploreRoute(currentExploreIndex, -1);
   if (adjacent) flyToLocation(adjacent.route, EXPLORE_ROUTE_ORDER[currentExploreIndex]);
 });
 

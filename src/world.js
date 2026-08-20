@@ -488,6 +488,16 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // stays visually intact. 118.8MB -> 98.8MB - first time this file's been
 // under GitHub's 100MB push limit.
 
+// "anything else i can cut down?" - ran the same rule the compressable.zip
+// pass established, across the WHOLE file instead of just the 80 you'd
+// hand-picked: every PNG whose alpha channel is dead (material's alphaMode
+// is the glTF default OPAQUE, so the renderer never reads it) becomes JPEG
+// quality 94. Found 99 more this way (56.6MB). Held back 15 that genuinely
+// need alpha - BLEND-mode materials, plus anything shading.js force-cuts-
+// out by name (eyelash/eyeliner/eyebrow hints) - those stayed untouched
+// PNGs. Every already-JPEG image, and the two lit-exception record-store
+// materials, untouched as before. 98.8MB -> 54.8MB.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

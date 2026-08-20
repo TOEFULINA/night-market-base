@@ -38,15 +38,17 @@ function makeGlowTexture() {
   return tex;
 }
 
+// "make the volumetric fog black" - was a light grey/lavender (205,200,215),
+// matching the purple-grey street fog's tone. Straight black now instead.
 function makeSmokeTexture() {
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, 'rgba(205,200,215,0.5)');
-  gradient.addColorStop(0.5, 'rgba(205,200,215,0.2)');
-  gradient.addColorStop(1, 'rgba(205,200,215,0)');
+  gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+  gradient.addColorStop(0.5, 'rgba(0,0,0,0.2)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);

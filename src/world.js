@@ -261,6 +261,7 @@ export function buildWorld(scene, renderer) {
   const atmosphere = createAtmosphere(scene);
 
   addStreetScene(scene);
+  addBackgroundBuilding(scene);
 
   return { updateAtmosphere: atmosphere.update };
 }
@@ -550,6 +551,46 @@ async function addStreetScene(scene) {
     streetSceneStatus.detail = String(err?.message ?? err);
   } finally {
     loadingManager.itemEnd(STREET_LOADING_TOKEN);
+  }
+}
+
+// Background filler building (BG_BUILDING.glb, from your upload "BG
+// BUILDING.glb" - a single standalone mesh, not a swap onto anything in the
+// main street scene). Placement is NOT guessed - the source file already
+// carries a real position/rotation/scale baked onto its one node
+// (translation ~44.8/16.3/-4.0, uniform scale ~57.6x), well outside the
+// walkable radius (controls.js's WORLD_RADIUS is 30), consistent with "put
+// it behind the walkable scene" - so this just loads the file and adds it
+// as-is, no transform copying needed like the other additive rebakes.
+//
+// Optimization: the source shipped 3 textures (Color 8192x8192, NormalGL
+// 4096x4096, ORM 4096x4096 - a full PBR set from what looks like an AI
+// mesh-gen tool export, "tripo_..." names). Only Color survives - this mesh
+// goes through toUnlitFlat() below same as everything else baked in this
+// scene, which only ever reads material.map; normal/ORM are never sampled
+// by an unlit MeshBasicMaterial, so shipping them would've been pure dead
+// weight. Color resized 8192 -> 1024px (this project's own "background
+// clutter" tier, see public/models/README.md) since it's meant to be seen
+// from a distance, not walked up to. Landed at 0.44MB from the 5.8MB raw
+// upload.
+async function addBackgroundBuilding(scene) {
+  try {
+    const { scene: bg } = await loadModel('/models/BG_BUILDING.glb');
+    bg.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      unlit.polygonOffset = true;
+      unlit.polygonOffsetFactor = 1;
+      unlit.polygonOffsetUnits = 1;
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.castShadow = true;
+      obj.receiveShadow = false;
+    });
+    scene.add(bg);
+  } catch (err) {
+    console.error('[bg building] failed to load BG_BUILDING.glb:', err);
   }
 }
 

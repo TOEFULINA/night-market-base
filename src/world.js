@@ -572,17 +572,21 @@ async function addStreetScene(scene) {
 // toUnlitFlat() below same as everything else baked in this scene, which
 // only ever reads material.map - normal/ORM are never sampled by an unlit
 // MeshBasicMaterial, so shipping them is dead weight regardless of which
-// upload they came from). Also baked a Gaussian blur directly into the
-// texture - this project has no real depth-of-field render pass, so a
-// pre-blurred texture is the cheap equivalent for a background element that
-// should read as soft/hazy/distant rather than crisp, same intent as the
-// title screen's tilt-shift pass (postprocessing.js). First pass used
-// radius 14 per "waaaay more blurred," which turned out to blur past
-// recognizable ("doesn't look anything like this") - you clarified you
-// meant tilt-shift-style distance softening, not destroying the image, so
-// this is a second, lighter pass at radius 4: buildings/windows still read
-// clearly, just soft like they're a block back. Texture has real (non-
-// cutout) alpha - carried through as alphaMode BLEND, not forced opaque.
+// upload they came from).
+//
+// NOT blurring the texture anymore. Two earlier passes baked a Gaussian
+// blur in as a cheap stand-in for depth-of-field (radius 14, then a lighter
+// radius 4 after "doesn't look anything like this") - both were the wrong
+// move per your call: "dont bake the texture. it already is baked" - it's
+// your finished bake, not raw source for me to reprocess, and any "seems
+// farther away" treatment belongs in a real render-time effect (like the
+// title screen's tilt-shift pass, postprocessing.js) if/when this mesh
+// needs one, not baked destructively into the only copy of the texture.
+// This pass just re-encodes the PNG with PIL's optimize=True (lossless -
+// same pixels, smaller file from better DEFLATE settings) per "compress it
+// at MOST but please dont much": ~863KB -> ~650KB, pixel-identical, no
+// quality lost. Texture has real (non-cutout) alpha - carried through as
+// alphaMode BLEND, not forced opaque.
 async function addBackgroundBuilding(scene) {
   try {
     const { scene: bg } = await loadModel('/models/BG_BUILDING.glb');

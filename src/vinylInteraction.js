@@ -39,6 +39,19 @@ import * as THREE from 'three';
 // this feature was first built - the isMesh check would have looked
 // correct in review but the name lookup itself was always failing first.
 export const RECORD_PLAYER_NODE_NAME = 'RecordPlayer_Cube070';
+// The record disc itself - "i also added a record on the vinyl that can be
+// shown when the record player is clicked on." Node identity confirmed
+// directly, not guessed: your standalone "justvinyle.glb" upload is a
+// single node named Counter_Cube.001 with an exact translation/rotation/
+// scale match to the node of the same name already sitting in
+// TRY7_SCENE.glb's full scene, so that's unambiguously the same object.
+// Its material is VynilMaterial.004 too - the same name this codebase
+// already tracks as "the vinyl records material" (the one HD exceptions
+// apply to elsewhere in world.js), which lines up with "the vinyl" being
+// exactly what this node is. Hidden by default (see toUnlitFlat traversal
+// in world.js) and toggled visible for the duration of the lock-in below,
+// rather than always being there sitting on the player.
+export const RECORD_DISC_NODE_NAME = 'Counter_Cube001'; // sanitized - raw name is "Counter_Cube.001" (GLTFLoader strips the dot, keeps the underscore)
 const RECORD_PLAYER_CENTER = new THREE.Vector3(-5.72, 0.87, -11.46);
 const LOCK_CAMERA_OFFSET = new THREE.Vector3(0, 0.5, -1.0);
 // Max distance (world units) from the player to the record player for a
@@ -61,6 +74,7 @@ export class VinylInteraction {
     this.onUnlocked = onUnlocked; // () => void - fires once back to normal walk control
 
     this.target = null; // resolved RecordPlayer_Cube.070 mesh, set by bindTarget()
+    this.recordDisc = null; // resolved Counter_Cube.001 (the vinyl record) mesh, set by bindTarget()
     this.locked = false;
 
     this._lockPos = RECORD_PLAYER_CENTER.clone().add(LOCK_CAMERA_OFFSET);
@@ -96,10 +110,18 @@ export class VinylInteraction {
     if (this.target) return;
     const mesh = street.getObjectByName(RECORD_PLAYER_NODE_NAME);
     if (!mesh || !mesh.isMesh) {
-      console.warn(`[vinyl interaction] ${RECORD_PLAYER_NODE_NAME} not found in TRY4_SCENE - skipping`);
+      console.warn(`[vinyl interaction] ${RECORD_PLAYER_NODE_NAME} not found in TRY7_SCENE - skipping`);
       return;
     }
     this.target = mesh;
+
+    const disc = street.getObjectByName(RECORD_DISC_NODE_NAME);
+    if (disc && disc.isMesh) {
+      this.recordDisc = disc;
+      this.recordDisc.visible = false; // hidden until locked in - see the constant's writeup above
+    } else {
+      console.warn(`[vinyl interaction] ${RECORD_DISC_NODE_NAME} not found in TRY7_SCENE - skipping the record reveal`);
+    }
   }
 
   // Note: this fires on the browser's native 'click' event, which doesn't
@@ -134,6 +156,10 @@ export class VinylInteraction {
   _lockIn() {
     this.locked = true;
     this.controls.locked = true; // controls.js's update() early-returns while this is set, see there
+    // "shown when the record player is clicked on" - reveal immediately on
+    // click, not once the zoom-in transition finishes, so it's there the
+    // whole time you're approaching rather than popping in after the fact.
+    if (this.recordDisc) this.recordDisc.visible = true;
     this._savedYaw = this.controls.yaw;
     this._savedPitch = this.controls.pitch;
     this._savedPos.copy(this.camera.position);
@@ -179,6 +205,10 @@ export class VinylInteraction {
         // rotation.y/x from exactly where the slerp left off, no pop
         this.controls.yaw = this._savedYaw;
         this.controls.pitch = this._savedPitch;
+        // Hide the record again only once the pan-away transition has
+        // actually finished, not the instant Escape/unlock() is pressed -
+        // otherwise it'd visibly vanish mid-frame while still on screen.
+        if (this.recordDisc) this.recordDisc.visible = false;
         this.onUnlocked?.();
       } else {
         this.onLocked?.();

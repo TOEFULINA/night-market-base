@@ -518,6 +518,19 @@ async function addStreetScene(scene) {
     // the same already-correct TRY7 materials (341/342/281), node
     // transforms copied verbatim from the upload too.
     //
+    // Dedup pass (your "how are we looking size-wise" ask): MD5'd every
+    // embedded image and found 9 groups of EXACT byte-for-byte duplicates,
+    // mostly from the vinyl-family material patches above re-encoding the
+    // SAME source pixels as a fresh image instead of reusing what was
+    // already in the file (VynilMaterial_Normal_OpenGL existed 3 separate
+    // times - 9.92MB/3072px each). Repointed every texture onto a single
+    // canonical copy per group and fully compacted the images/bufferViews
+    // arrays so the freed bytes are actually gone, not just orphaned JSON.
+    // Nothing about resolution or quality changed - every surviving image
+    // is byte-identical to what was already there, this only removed
+    // exact duplicates. 177.0MB -> 153.6MB file size, ~2.38GB -> ~2.15GB
+    // estimated decoded GPU memory.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

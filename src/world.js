@@ -490,6 +490,16 @@ async function addStreetScene(scene) {
     // scene directly (translation/rotation/scale, all 5 nodes) - byte-
     // identical, nothing had actually moved this round.
     //
+    // Real bug, found after actually looking at the extracted PNGs instead
+    // of trusting pixel-diff numbers alone: the "combocrates" image inside
+    // bakedvinylnewtextures.glb (used for BoxMaterial_combocrates_patch,
+    // material ".005") is genuinely dark/washed out - confirmed against
+    // the RAW upload bytes directly, not something my re-encode broke. You
+    // posted the actual correct bake as an image (saved as
+    // uploads/combocrates.png) - swapped material 342's baseColor to that
+    // file directly. Standard tier, already 1024 with real alpha, no
+    // resize needed.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

@@ -498,6 +498,20 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // PNGs. Every already-JPEG image, and the two lit-exception record-store
 // materials, untouched as before. 98.8MB -> 54.8MB.
 
+// "finish sweeping first!" - last pass, checked all 25 remaining PNGs by
+// hand. 7 (Material_#1000000024/25, #69, #1111225183/203/204, #27_1, all
+// OPAQUE) turned out to have no alpha channel at all - missed by the last
+// two sweeps since that logic only handled "alpha present but dead," never
+// "no alpha to begin with." Nothing to lose there - straight JPEG q94. The
+// other 15 are genuine BLEND-mode alpha (baskets, fence/rail, 3
+// RecordSWindowMaterial variants, a few small props) - kept PNG, ran a
+// lossless re-optimize pass (0 improved further - they were already
+// optimally encoded). The last 3 (RecordStoreWalls' normal, VynilMaterial's
+// merged normal + metallic-roughness) are untouched, same as every pass
+// before - normal maps stay lossless, and these are the only 2 materials
+// left reading real PBR data. 54.8MB -> 49.4MB. Every PNG left in the file
+// now has a specific, checked reason to still be one.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

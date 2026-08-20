@@ -467,6 +467,27 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // walls, and a one-line roughnessFactor tweak if it ever reads wrong,
 // rather than carrying a whole texture for it. 119.8MB -> 118.8MB.
 
+// "compressable.zip" + "keep the visual strength as much as possible" -
+// your triage of 80 background-prop textures you want SHRUNK, not deleted
+// (unlike the deletable pass above). Matched by filename against the
+// current file (with a truncation-prefix fallback for names the original
+// export cut short, like RecordSWindowMaterial's combined name) - 76 of 80
+// still exist.
+//
+// Checked alphaMode on every material touching these 76 before compressing
+// anything: baskets, a network-rail fence, and RecordSWindowMaterial.002
+// (actual window glass) are BLEND-mode and genuinely need their alpha
+// channel, so those stayed PNG - lossless re-optimize only, same pixels.
+// 30 were already JPEG - left completely untouched, since re-encoding an
+// already-lossy JPEG is pure quality loss for little size gain, which
+// works against "keep the visual strength." The other 39 are PNGs whose
+// alpha channel is present but DEAD (their material's alphaMode is the
+// glTF default OPAQUE - the renderer never reads that alpha regardless of
+// what's baked into it) - converted those to JPEG quality 94, well above
+// what's already used elsewhere in this file, so the actual baked detail
+// stays visually intact. 118.8MB -> 98.8MB - first time this file's been
+// under GitHub's 100MB push limit.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

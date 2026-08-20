@@ -22,7 +22,7 @@ Then open the local URL Vite prints.
 - **Walk mode** (`src/controls.js`) — first-person WASD + drag-look (desktop) or joystick + drag-look (mobile). No physics engine — a flat ground plane plus a soft world-radius/wall clamp instead of real collision. `Controls`/`VinylInteraction` both have real `dispose()` methods so repeated Home ↔ walk round trips don't leak listeners.
 - **Explore locations** — four fixed storefront spots (archive shop, records, prints/action figures, packaging) wired into `LOCATIONS` in `main.js`. Arriving at one shows `<`/`>` arrows to cycle to the next/previous spot and clamps how far you can look left/right (keeps you facing the dressed set instead of staring into empty space); both go away the instant you move.
 - **Vinyl store record-player interaction** (`src/vinylInteraction.js`) — click the record player to lock the camera into a close-up view.
-- **Rendering** (`src/world.js`, `src/shading.js`, `src/atmosphere.js`, `src/postprocessing.js`) — real-time shadows, ACES filmic tone mapping, an environment map for PBR materials, bloom, a tilt-shift pass (used for the orthographic title framing), fog, and a floating light-orb/smoke atmosphere layer. The whole street/market scene loads from one file (`TRY6_SCENE.glb`) via `addStreetScene()` in `world.js` — earlier versions layered separate per-room "rebake" files on top of a base scene at load time; that base scene now already contains the finalized bakes for every room, so the overlay code is unwired (not deleted) rather than removed outright.
+- **Rendering** (`src/world.js`, `src/shading.js`, `src/atmosphere.js`, `src/postprocessing.js`) — real-time shadows, ACES filmic tone mapping, an environment map for PBR materials, bloom, a tilt-shift pass (used for the orthographic title framing), fog, and a floating light-orb/smoke atmosphere layer. The whole street/market scene loads from one file (`TRY7_SCENE.glb`) via `addStreetScene()` in `world.js` — earlier versions layered separate per-room "rebake" files on top of a base scene at load time; that base scene now already contains the finalized bakes for every room, so the overlay code is unwired (not deleted) rather than removed outright.
 - **Layer-gated geometry** — a couple of scene objects (a filler ground plane and a background wall/building) only render in walk mode; the title screen's orthographic camera skips them via `THREE.Layers` (layer 1) so they can't end up sitting in front of the sign building on the main menu. See `TITLE_HIDDEN_NODE_NAMES` in `world.js` and `camera.layers.enable(1)` in `main.js`.
 
 ## Structure
@@ -47,7 +47,7 @@ Then open the local URL Vite prints.
 
 - Portfolio submenu items (Graphic Design, Illustration, Merchandise Design, Dynamics, 3D Modeling), Contact, and About don't have real destinations yet — clicking them just logs to the console.
 - Per-sign routing on the title screen isn't built — every sign currently enters walk mode at the default spawn.
-- `public/models/TRY6_SCENE.glb` is ~150MB (a few textures are intentionally kept HD - see below); this repo doesn't use Git LFS, so a fresh clone is a fairly large download. Worth moving to LFS (or a CDN) if that becomes a problem.
+- `public/models/TRY7_SCENE.glb` is ~152MB (a few textures are intentionally kept HD - see below); this repo doesn't use Git LFS, so a fresh clone is a fairly large download. Worth moving to LFS (or a CDN) if that becomes a problem.
 
 ## Notes on the asset pipeline
 

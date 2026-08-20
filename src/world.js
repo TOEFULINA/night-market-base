@@ -378,88 +378,48 @@ const STREET_LOADING_TOKEN = 'street-scene-full-load';
 async function addStreetScene(scene) {
   loadingManager.itemStart(STREET_LOADING_TOKEN);
   try {
-    // TRY5_SCENE.glb - latest full-scene pass, replacing TRY4_SCENE.glb.
-    // Source upload: 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb, 691MB raw.
-    // This is TRY5's source (921_WEB_OPTIMIZED_FINALSAVE_allbaked.glb) with
-    // 3 new nodes added on top and nothing removed - verified by diffing
-    // every node name between the two uploads directly (0 removed, exactly
-    // 3 added): Plane.002 ("a new ground plane"), Plane.003 ("a wall with a
-    // building on it"), and a second copy of the standalone BG_BUILDING
-    // mesh, now merged directly into the main scene instead of loaded as
-    // its own file (see the retired addBackgroundBuilding() below).
+    // TRY7_SCENE.glb - latest full-scene pass. History (TRY4 -> TRY5 -> TRY6)
+    // trimmed out of this comment since it was getting long enough to bury
+    // what's actually current - see git log on this file if you need the
+    // play-by-play (each swap's reasoning is in its own commit message).
     //
-    // The image list is the same story underneath a reshuffled order: byte-
-    // for-byte content hashing (not array position - the order shifted
-    // starting a few images in) showed 543 of 552 images are byte-identical
-    // to something already in 921. TRY5's build already spent real time
-    // correctly processing all of 921's images once (1536px cap/JPEG q80,
-    // the two HD exceptions below, the normal-map-stays-PNG rule) - this
-    // reuses that finished work by content hash instead of redoing it, so
-    // only the 9 genuinely-new images (the new ground/wall/building
-    // textures, plus a handful of re-baked shop textures that came along in
-    // this same upload) needed fresh processing. Landed at 149.5MB, in line
-    // with TRY5's 145.4MB plus the new geometry/textures.
+    // Source upload: heavydutyfullscene.glb, 648MB raw - "baked a few new
+    // textures like the fence and added a new building." Verified by direct
+    // diff against TRY6's source, not assumed: 714 nodes (was 724) - NOT
+    // purely additive this time, 4 added / 14 removed. The removed 14 don't
+    // match anything this codebase references by name (checked against
+    // every MENU_SIGN/THRIFT/VINYL/LANDMARKS/LIT_EXCEPTION/RECORD_PLAYER
+    // list directly) - reads as Blender-side geometry cleanup alongside the
+    // rebakes, not anything load-bearing. One removed node DOES matter
+    // though: Plane.003, the old flat billboard-with-a-photo "wall with a
+    // building on it" - gone, replaced by one of the 4 added nodes,
+    // tripo_node_1b17d649..., a real 3D building mesh this time instead of
+    // a flat cutout plane. See TITLE_HIDDEN_NODE_NAMES below - carried the
+    // same "don't block the title camera" layer treatment over to it. The
+    // other 3 added nodes (2 Counter_Cube/1 Stickersbox02) are plain props,
+    // nothing referenced them before so nothing to update.
     //
-    // Continuity with TRY4/TRY5 verified directly, not assumed: every name
-    // this codebase references - all 17 MENU_SIGN_NODE_NAMES (titleScreen.js),
-    // all 14 THRIFT_SIMPLE_SWAP_NODE_NAMES, all 54
-    // VINYL_STORE_SIMPLE_SWAP_NODE_NAMES, plus the crates/glass-building/
-    // cover-supply landmark nodes - resolves to a real object under the
-    // exact same name in this file too. Same reasoning as before: the five
-    // per-room rebake overlays (vinyl/thrift/crates/glass/cover-supply) stay
-    // DISABLED - see the long comment at their old Promise.all call site.
+    // Images: 548/554 byte-identical to TRY6's source by content hash
+    // (reused, not reprocessed - same approach as every prior full-scene
+    // swap), 6 genuinely new: the fence rebake ("sidebakedrail"/"bakedfence",
+    // landing on existing nodes B_Networkrail_0003/007 - texture-only swap,
+    // matches "baked... the fence" exactly), a speaker rebake, a fresh
+    // "groundbake" (this one didn't match TRY6's patched-in version by hash,
+    // but same small 1024px non-issue either way), and the new building's
+    // normal+color maps (normal forced PNG per the usual rule, never JPEG).
+    // Standard 1536px/JPEG-q80 tier throughout, same two called-out HD
+    // exceptions as always (RecordStoreWallsMaterial.002 wall/floor,
+    // VynylMaterial.004 records, both 3072px + lossless normal maps) plus
+    // the thrift clothing/shoe HD tier. Landed at 152.0MB.
     //
-    // A few shop textures came back different-but-same-index-story as part
-    // of this same content-hash diff: "baked figurines main" and "baked
-    // bravest back light baked" are genuinely new content (not reused from
-    // 921) - likely the fix for the merch-shelf shelf you flagged as stale
-    // ("PACKAGING DESIGN BY TOEFU"/BRAVEST/figurines), since this upload
-    // came right after you confirmed that was an old-textures problem.
-    //
-    // Standard 1536px-cap/JPEG-q80 texture treatment applied scene-wide
-    // (same as TRY4/TRY5), with the same two called-out HD exceptions: the
-    // vinyl store wall/floor bake (RecordStoreWallsMaterial.002) and "the
-    // vinyl" records material (VynylMaterial.004) both got a 3072px cap
-    // instead of 1536, AND their normal maps were kept as lossless PNG
-    // rather than JPEG (JPEG's block/chroma artifacts visibly corrupt
-    // normal-encoded surface direction - not an acceptable tradeoff for
-    // "keep this good"). Thrift store clothing/shoe items also got the
-    // 3072px HD treatment. The BG building's own base-color bake got its
-    // own separate lossless-no-blur treatment (see the merge note further
-    // down) since that one's a finished asset of yours, not raw source to
-    // recompress hard.
-    //
-    // Ground plane (Material.005, Plane.002) originally shipped with no
-    // texture at all - just a flat grey baseColorFactor (~0.145). Patched
-    // in after the fact from your "bakedgroundplane.glb" upload, same node/
-    // material/transform already in this file (checked directly), just
-    // adding the real "groundbake" texture. baseColorFactor removed
-    // entirely rather than left at that flat grey, since glTF multiplies
-    // factor x texture and 0.145 would've crushed the new bake to near-
-    // black. Small enough (1024px) it didn't need any downsizing, alpha
-    // checked out fully opaque so shipped as plain RGB.
-    //
-    // The wall+building's texture (Material.006, Plane.003) is now a
-    // second lossless exception, patched in after the fact per "uncompress
-    // that new building plane image and remove the emission": it had
-    // originally gone through the standard 1536px/JPEG-q80 tier same as
-    // everything else uncalled-out, but got re-extracted at its full native
-    // resolution (6336x2688, lossless PNG, no resize) instead. Also dropped
-    // that material's emissiveTexture/emissiveFactor/KHR_materials_emissive_strength
-    // entirely - it was pointing the SAME texture back in as emissive with
-    // strength 3.4, which would've bloomed the whole wall/building.
-    //
-    // Texture swapped again right after per "i dont want the sky in the
-    // image" - the original bake had its sky as flat opaque black (RGB,
-    // no alpha channel), so the plane always showed a hard black rectangle
-    // behind the buildings instead of blending into the scene's actual fog/
-    // background. Your "buildings.png" upload is the same shot with a real
-    // alpha channel this time (checked directly: 73% fully opaque, 26%
-    // fully transparent, ~1% soft antialiased edge pixels - a clean cutout,
-    // not a painted blend), so the material picked up alphaMode BLEND to
-    // keep those soft edges instead of snapping to a hard cutoff, same
-    // treatment as every other real-alpha texture in this project.
-    const { scene: street } = await loadModel('/models/TRY6_SCENE.glb');
+    // Continuity re-verified in full against the SAME reference lists every
+    // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
+    // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,
+    // plus the crates/glass-building/cover-supply landmark nodes - still
+    // resolve under their exact names. The five per-room rebake overlays
+    // stay DISABLED, same reasoning as always - see their old Promise.all
+    // call site further down.
+    const { scene: street } = await loadModel('/models/TRY7_SCENE.glb');
 
     // Baked/unlit by DEFAULT now - only LIT_EXCEPTION_MATERIAL_NAMES above
     // (just the record-store wall's normal map at this point - see the note
@@ -531,13 +491,16 @@ async function addStreetScene(scene) {
     // NOT included here - it already existed before this upload as a
     // separate file and nobody flagged it blocking the title view, so it
     // stays on the default layer, visible from both cameras same as always.
-    const TITLE_HIDDEN_NODE_NAMES = ['Plane.002', 'Plane.003'];
+    // Plane.003 -> tripo_node_1b17d649... as of TRY7_SCENE.glb - the flat
+    // billboard got replaced by a real building mesh (see the load comment
+    // above), same "don't block the title camera" concern carries over.
+    const TITLE_HIDDEN_NODE_NAMES = ['Plane.002', 'tripo_node_1b17d649-d3ad-4287-9088-27fc9b46c0de'];
     for (const rawName of TITLE_HIDDEN_NODE_NAMES) {
       const node = street.getObjectByName(sanitizeGltfName(rawName));
       if (node) {
         node.layers.set(1);
       } else {
-        console.warn(`[title-hidden] ${rawName} not found in TRY6_SCENE - skipping`);
+        console.warn(`[title-hidden] ${rawName} not found in TRY7_SCENE - skipping`);
       }
     }
 

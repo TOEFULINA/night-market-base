@@ -374,16 +374,16 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
   'Material_#1111223369_2', 'Material_#5366',
   // "i want normals on the wall, floor, and vinyl in the vinyl shop" -
   // wall/floor is RecordStoreWallsMaterial.002 above, already covered.
-  // The vinyl itself is this whole family - all 5 variants currently in
-  // use (VynilMaterial.001/.002/.003/.004 plus the .005 clone built for
-  // PlasticCrate02), added together so every vinyl prop in the shop reads
-  // consistently lit rather than some staying flat. Their normal/
-  // roughness textures were stripped by the "dead weight" pass right
-  // before this ask (they weren't lit exceptions yet, so toUnlitFlat was
-  // never going to read them) - restored from the pre-strip commit, same
-  // bytes as before, not a re-bake.
-  'VynilMaterial.001', 'VynilMaterial.002', 'VynilMaterial.003',
-  'VynilMaterial.004', 'VynilMaterial_005_patch',
+  // "theres one vinyl material not 5?" + "merge down to one material and
+  // use these" (your own normal + base color atlas) - the 5 separate
+  // Vynil materials only ever existed because each upload round added its
+  // own copy of the same vinyl-record concept. Collapsed down to one
+  // (VynilMaterial.004 - kept because it was already wired to the most
+  // geometry, 17 of 22 vinyl primitives) with your new normal/base color
+  // textures, every primitive that used .001/.002/.003/VynilMaterial_005_patch
+  // repointed onto it, and those 4 now-empty material slots removed
+  // entirely. One name here instead of five.
+  'VynilMaterial.004',
 ]);
 
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four

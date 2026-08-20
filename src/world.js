@@ -468,6 +468,14 @@ async function addStreetScene(scene) {
     // above - expected, vinyl is the one family that's deliberately staying
     // HD.
     //
+    // Missed two on that pass: PlasticCrate04_Cube.001 and
+    // PlasticCrate05_Cube.001 weren't in bakedvinylnewtextures.glb (only
+    // 02/03/06 were), so they got skipped even though they needed the same
+    // "combocrates" fix as 03/06 - a follow-up upload ("fucking please.glb")
+    // called them out specifically. No new texture work needed, just
+    // rewired both onto the already-existing BoxMaterial_combocrates_patch
+    // material from the round above.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

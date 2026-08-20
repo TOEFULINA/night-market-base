@@ -236,7 +236,8 @@ export function buildWorld(scene, renderer) {
   // through a gap.
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
-    new THREE.MeshStandardMaterial({ color: 0x3a3a3f, roughness: 0.95, metalness: 0 })
+    // Black instead of grey per your call - was 0x3a3a3f.
+    new THREE.MeshStandardMaterial({ color: 0x030303, roughness: 0.95, metalness: 0 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
@@ -571,13 +572,17 @@ async function addStreetScene(scene) {
 // toUnlitFlat() below same as everything else baked in this scene, which
 // only ever reads material.map - normal/ORM are never sampled by an unlit
 // MeshBasicMaterial, so shipping them is dead weight regardless of which
-// upload they came from). Also baked a strong Gaussian blur (radius 14 at
-// 1024px) directly into the texture per "waaaay more blurred for
-// perspective" - this project has no real depth-of-field render pass, so a
+// upload they came from). Also baked a Gaussian blur directly into the
+// texture - this project has no real depth-of-field render pass, so a
 // pre-blurred texture is the cheap equivalent for a background element that
-// should read as soft/hazy/distant rather than crisp. Texture has real
-// (non-cutout) alpha - carried through as alphaMode BLEND, not forced
-// opaque.
+// should read as soft/hazy/distant rather than crisp, same intent as the
+// title screen's tilt-shift pass (postprocessing.js). First pass used
+// radius 14 per "waaaay more blurred," which turned out to blur past
+// recognizable ("doesn't look anything like this") - you clarified you
+// meant tilt-shift-style distance softening, not destroying the image, so
+// this is a second, lighter pass at radius 4: buildings/windows still read
+// clearly, just soft like they're a block back. Texture has real (non-
+// cutout) alpha - carried through as alphaMode BLEND, not forced opaque.
 async function addBackgroundBuilding(scene) {
   try {
     const { scene: bg } = await loadModel('/models/BG_BUILDING.glb');

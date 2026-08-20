@@ -147,12 +147,13 @@ export class Controls {
   // main.js points at the newest instance), but that's a real, unbounded
   // listener leak over repeated home/re-enter cycles, not just a style nit.
   _setupDesktop() {
-    const overlay = document.getElementById('intro-overlay');
-    overlay.classList.add('visible');
-    // first click just dismisses the intro text - no pointer lock, nothing
-    // to "enter". Dragging to look works whether the overlay's up or not.
-    overlay.addEventListener('click', () => overlay.classList.remove('visible'), { once: true });
-
+    // "night market" / WASD-instructions overlay used to auto-show here on
+    // every walk-mode entry (including repeat Explore-menu round trips via
+    // Home's reverse pan) - per your "i dont want this here when i enter
+    // explore mode" call, dropped entirely. #intro-overlay/.visible stay
+    // defined in style.css/index.html unused rather than deleted, same
+    // "unwire don't delete" pattern as the per-room rebakes in world.js, in
+    // case you want a one-time first-visit version of this back later.
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
@@ -197,10 +198,8 @@ export class Controls {
   }
 
   _setupTouch() {
-    document.getElementById('intro-overlay').classList.add('visible');
-    document.getElementById('intro-overlay').addEventListener('click', () => {
-      document.getElementById('intro-overlay').classList.remove('visible');
-    }, { once: true });
+    // See _setupDesktop above - intro overlay dropped from walk-mode entry
+    // on this path too.
 
     // --- virtual joystick (movement) ---
     const zone = document.getElementById('joystick-zone');

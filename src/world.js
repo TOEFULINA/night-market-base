@@ -429,6 +429,36 @@ const LIT_EXCEPTION_MATERIAL_NAMES = new Set([
 // quality cost there. Roughness on both materials was already 1024x1024,
 // untouched. 139.7MB -> 123.4MB.
 
+// "these are deletable" (deletable.zip, your manual triage of the 550-
+// texture review export, 301 files). Matched by filename against the
+// CURRENT file, not the old export's index numbers - those went stale
+// after 5 rounds of recompaction. 256 of the 301 were already gone (dead
+// normal/roughness/emissive maps from earlier strip passes, or old vinyl
+// variants merged away this session) - nothing left to do there. Of the 45
+// that were still live, held 2 back rather than deleting on your word
+// alone, because they directly contradict explicit earlier asks and small
+// Finder thumbnails make them easy to mistake for junk: "groundbake"
+// (Material.005, the actual walkable ground plane - deliberately near-
+// black per "Darken ground plane grey to black", which is exactly why a
+// thumbnail could read as empty), and RecordStoreWallsMaterial's roughness
+// map (one of only 2 materials left with real PBR normal/roughness,
+// specifically because "i want normals on the wall, floor, and vinyl").
+// Flagged those back to you instead of silently dropping them.
+//
+// The remaining 43 (all background-prop baseColorTextures going through
+// toUnlitFlat - lamps, windows, cabinets, pipes, a traffic sign, non-hero
+// NPC clothing; none share a name with any of your custom vinyl/thrift/sign
+// bakes) had their texture reference replaced with a baseColorFactor set to
+// that image's own average color (sRGB->linear converted to render the
+// same as an average texture sample would) instead of just deleting the
+// reference outright, which would've left them at glTF's default white.
+// Many were already flat single-color swatches, so this is a zero-visual-
+// change removal for those; the handful with real detail get flattened to
+// their average tone, per your call. Checked the 2 window materials
+// (alphaMode BLEND) for a real per-pixel glass pattern before doing this -
+// both were already uniform flat alpha, so that alpha carried straight
+// into the new baseColorFactor too. 123.4MB -> 119.8MB.
+
 // Manually folds the FULL street setup - base TRY4_SCENE.glb load, all four
 // rebake swaps, and the free windows material - into loader.js's shared
 // LoadingManager queue, not just the base file. Without this, the manager's

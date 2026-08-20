@@ -419,6 +419,26 @@ async function addStreetScene(scene) {
     // VynylMaterial.004 records, both 3072px + lossless normal maps) plus
     // the thrift clothing/shoe HD tier. Landed at 152.0MB.
     //
+    // Memory-crash fix (post-launch): the browser tab was getting killed by
+    // Chrome's "significant memory" tab-kill. Measured directly, not
+    // guessed - 554 unique textures across this scene decode to ~2.5GB of
+    // GPU memory once uploaded+mipmapped (no texture atlasing, every
+    // baked room/prop is its own image). The real fix is GPU-compressed
+    // textures (KTX2/Basis - the loader support from way back is sitting
+    // unused for exactly this), but there's no encoder tool reachable to
+    // do that conversion right now. Stopgap: dropped the standard tier's
+    // JPEG/PNG resolution 1536px -> 1024px, EXCEPT the 17 sign panels
+    // (MENU_SIGN_NODE_NAMES), the 14 thrift clothing/shoe items
+    // (THRIFT_SIMPLE_SWAP_NODE_NAMES), and the two established HD-tier
+    // materials (RecordStoreWallsMaterial.002 wall/floor, VynylMaterial.004
+    // records - left fully untouched at 3072px, not even trimmed to 2048)
+    // per your "keep the agreed high res" call - those 25+4 images were
+    // walked out via the real node->mesh->material->texture graph, not
+    // guessed from filenames. Only 64 of 554 images actually changed.
+    // Brought the ~2.5GB estimate down to ~2.05GB - real but partial; if
+    // the crashes continue, the next lever is the untouched 1024px bucket
+    // (231 images, ~1.3GB on its own) or finally sourcing a KTX2 encoder.
+    //
     // Continuity re-verified in full against the SAME reference lists every
     // prior swap has checked: all 17 MENU_SIGN_NODE_NAMES, 14
     // THRIFT_SIMPLE_SWAP_NODE_NAMES, 54 VINYL_STORE_SIMPLE_SWAP_NODE_NAMES,

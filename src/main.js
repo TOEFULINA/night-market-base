@@ -3,7 +3,7 @@ import { Controls } from './controls.js';
 import { buildWorld, streetSceneStatus, streetScene } from './world.js';
 import { initLoadingUI } from './loader.js';
 import { TitleScreen } from './titleScreen.js';
-import { createPostProcessing } from './postprocessing.js';
+import { createPostProcessing, grainUniforms } from './postprocessing.js';
 import { flickerUniforms } from './shading.js';
 import { VinylInteraction } from './vinylInteraction.js';
 
@@ -187,6 +187,14 @@ const LOCATIONS = {
   'explore-records': { x: -5.61, y: 1.3, z: -15.25, yawDeg: 141 },
   'explore-prints-figures': { x: 3.66, y: 1.3, z: -18.9, yawDeg: 179 },
   'explore-packaging': { x: 10.25, y: 1.3, z: -18.9, yawDeg: 209 },
+  // "About Me" camera framing - debug-HUD coordinates from your two
+  // screenshots looking up at ME.glb sitting on top of Loki: first pass
+  // gave position/yaw (x:-15.13, y:1.30, z:-18.90, yaw:170°), second pass
+  // (after pitch got added to the HUD - see updatePositionDebug) confirmed
+  // the same spot within a few cm and added pitch:17°. Same
+  // LOCATIONS/flyToLocation path every other menu destination uses, so
+  // clicking "About" flies here the same way Explore items do.
+  about: { x: -15.16, y: 1.3, z: -18.87, yawDeg: 170, pitchDeg: 17 },
 };
 
 // Cycling order for the </> Explore-nav arrows - matches index.html's
@@ -298,6 +306,7 @@ const EXPLORE_YAW_CLAMP = {
 function startTransition(routeKey) {
   if (mode === 'walk') return;
   mode = 'walk';
+  hideAboutOverlay(); // defensive - can't actually be open yet on the title screen, but keep every flight's start state consistent
 
   const orthoCam = titleScreen.camera;
   const orthoHeight = orthoCam.top - orthoCam.bottom; // full frustum height at zoom 1
@@ -320,10 +329,10 @@ function startTransition(routeKey) {
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
   // is given. If `routeKey` matches something in LOCATIONS above, override
-  // both the target position AND controls.yaw with that instead (pitch
-  // stays 0 either way - none of the captured spots needed a tilt) so
+  // both the target position AND controls.yaw/pitch with that instead so
   // controls.js picks up the right facing direction once it unlocks at the
-  // end of the flight.
+  // end of the flight. pitchDeg is optional per LOCATIONS entry (defaults
+  // to 0/dead level) - see flyToLocation's matching comment.
   controls = new Controls(camera, renderer.domElement);
   controls.locked = true;
 
@@ -332,6 +341,7 @@ function startTransition(routeKey) {
   if (location) {
     toPos = new THREE.Vector3(location.x, location.y, location.z);
     controls.yaw = THREE.MathUtils.degToRad(location.yawDeg);
+    controls.pitch = THREE.MathUtils.degToRad(location.pitchDeg ?? 0);
   } else {
     toPos = controls.camera.position.clone();
   }
@@ -366,8 +376,16 @@ function startTransition(routeKey) {
   // already 'walk' by the time this flight lands regardless of whether it
   // was your first entry or not, so "was this actually the first one" has
   // to be decided here while we still know.
-  const showWelcome = !hasEnteredWalkModeBefore;
-  hasEnteredWalkModeBefore = true;
+  //
+  // "do NOT give the WASD notification if im going straight to about me.
+  // about me is just a fixed camera not a walkaround" - 'about' never
+  // counts as "your first walkaround" here (both for showing the bubble
+  // THIS flight and for marking hasEnteredWalkModeBefore), so if About
+  // happens to be the very first thing you click from the title screen,
+  // the real WASD bubble still shows the first time you land somewhere
+  // you can actually walk around, whenever that ends up being.
+  const showWelcome = routeKey !== 'about' && !hasEnteredWalkModeBefore;
+  if (routeKey !== 'about') hasEnteredWalkModeBefore = true;
 
   transition = {
     t: 0,
@@ -414,6 +432,7 @@ function flyToLocation(routeKey, fromRouteKey) {
   if (!location) return;
 
   hideExploreNav(); // re-shown by activateExploreNavIfApplicable once this flight lands
+  hideAboutOverlay(); // re-shown below once this flight lands, only if the destination is 'about'
 
   const fromPos = camera.position.clone();
   const fromQuat = camera.quaternion.clone();
@@ -423,9 +442,14 @@ function flyToLocation(routeKey, fromRouteKey) {
 
   const toPos = new THREE.Vector3(location.x, location.y, location.z);
   const toYaw = THREE.MathUtils.degToRad(location.yawDeg);
+  // pitchDeg is optional per LOCATIONS entry - defaults to 0 (dead level)
+  // for every spot that never specified one, same as this always hardcoded
+  // to 0 before. See LOCATIONS' 'about' entry for why this needed adding:
+  // "i need to be looking head angled exactly, not just the position."
+  const toPitch = THREE.MathUtils.degToRad(location.pitchDeg ?? 0);
   controls.yaw = toYaw;
-  controls.pitch = 0;
-  const toQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, toYaw, 0, 'YXZ'));
+  controls.pitch = toPitch;
+  const toQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(toPitch, toYaw, 0, 'YXZ'));
 
   // See ROUTE_WAYPOINTS above - most pairs have no entry and fly straight
   // (unchanged behavior), a couple of specific pairs bend through a manual
@@ -489,6 +513,7 @@ function startReturnToTitle() {
   if (mode !== 'walk' || transition || !controls) return;
 
   hideExploreNav();
+  hideAboutOverlay();
 
   const orthoCam = titleScreen.camera;
   const orthoHeight = orthoCam.top - orthoCam.bottom;
@@ -686,6 +711,10 @@ function updateTransition(delta) {
     controls.locked = false; // hand control back to WASD/drag-look, camera is already exactly at the spawn pose
     activateExploreNavIfApplicable(finishedRoute);
     if (shouldShowWelcome) showWelcomeBubble();
+    // About Me overlay - shows once the flight actually lands on 'about',
+    // same "wait for arrival" timing as the welcome bubble/explore-nav
+    // above, not fired the instant you click the menu item.
+    if (finishedRoute === 'about') showAboutOverlay();
   }
   return orthoActive;
 }
@@ -707,10 +736,6 @@ function finishReturnToTitle() {
   titleScreen.rebind();
 
   mainMenuListEl?.classList.remove('collapsed');
-  // Same "no additional drop downs" reset as collapseMainMenu() below -
-  // landing back on the title screen with Portfolio still expanded from
-  // wherever you left it in walk mode would be the same stuck-open bug.
-  allSubmenus.forEach((el) => el.classList.remove('open'));
   document.getElementById('menu-home-item')?.classList.add('hidden');
   socialLinksEl?.classList.remove('hidden');
   vinylExitBtn?.classList.add('hidden'); // defensive - vinylInteraction.dispose() above didn't fire onUnlocked
@@ -720,33 +745,26 @@ function finishReturnToTitle() {
 
 // Corner nav overlay (PORTFOLIO / EXPLORE / CONTACT / ABOUT) - separate
 // from the in-scene sign clicks above, this is the flat HTML/CSS menu from
-// your mockup (index.html/style.css). Portfolio and Explore are now
-// dropdown parents (index.html's .has-submenu <li> wrapping a .menu-label
-// + nested .submenu <ul>) rather than direct links - clicking the label
-// just toggles the dropdown open/closed, it doesn't navigate anywhere
-// itself anymore. Subsection clicks route through startTransition(routeKey)
-// - if that route has an entry in LOCATIONS above, it flies to that exact
-// spot; otherwise it just logs, same "tell me the mapping" pattern as the
-// unrouted signs above.
+// your mockup (index.html/style.css). Portfolio and Explore are dropdown
+// parents (index.html's .has-submenu <li> wrapping a .menu-label + nested
+// .submenu <ul>). "i also want the menu drop downs to only show up on
+// hover" - these used to be click-to-toggle (a JS-driven .open class),
+// now pure CSS :hover (see style.css's `.has-submenu:hover .submenu`
+// rule) - no JS involved in opening/closing them at all anymore, they
+// just follow the mouse in and back out. Subsection clicks still route
+// through startTransition(routeKey) same as before - if that route has an
+// entry in LOCATIONS above, it flies to that exact spot; otherwise it
+// just logs, same "tell me the mapping" pattern as the unrouted signs
+// above.
 const mainMenuEl = document.getElementById('main-menu');
 const mainMenuListEl = document.getElementById('main-menu-list');
 
-const allSubmenus = document.querySelectorAll('#main-menu-list .has-submenu');
-
-// "dont keep the menu open always open it to the regular base subjects. no
-// additional drop downs" - closing the list used to leave whichever
-// submenu (Portfolio/Explore) you'd last expanded still marked .open, so
-// reopening the dropdown later popped straight back to wherever you left
-// it instead of the plain base-level list. Every place that collapses the
-// list now also resets every submenu closed, so it always reopens fresh.
 function collapseMainMenu() {
   mainMenuListEl?.classList.add('collapsed');
-  allSubmenus.forEach((el) => el.classList.remove('open'));
 }
 
 // Logo click - only does anything in walk mode (title screen already shows
-// the list permanently, no toggle needed there). Same collapsed/expanded
-// mechanics as the Portfolio/Explore submenus below, just one level up.
+// the list permanently, no toggle needed there).
 document.getElementById('main-menu-logo')?.addEventListener('click', () => {
   if (mode !== 'walk') return;
   if (mainMenuListEl?.classList.contains('collapsed')) {
@@ -754,18 +772,6 @@ document.getElementById('main-menu-logo')?.addEventListener('click', () => {
   } else {
     collapseMainMenu();
   }
-});
-
-document.querySelectorAll('.menu-label[data-toggle]').forEach((label) => {
-  label.addEventListener('click', () => {
-    const parent = label.closest('.has-submenu');
-    if (!parent) return;
-    const wasOpen = parent.classList.contains('open');
-    // Only one dropdown open at a time - close every other one before
-    // (possibly) opening this one, per your call.
-    allSubmenus.forEach((el) => el.classList.remove('open'));
-    if (!wasOpen) parent.classList.add('open');
-  });
 });
 
 // Portfolio gallery - fetch-once-cache-forever manifest (built at build
@@ -819,6 +825,22 @@ function closePortfolioLightbox() {
   portfolioLightboxContentEl.innerHTML = '';
 }
 
+// Fisher-Yates - unbiased shuffle (unlike `sort(() => Math.random() - 0.5)`,
+// which skews toward certain orderings since comparator-based sorts don't
+// call the comparison function evenly across all pairs). In-place on a
+// COPY of the manifest array, never the manifest itself - getPortfolioManifest()
+// caches that promise/array for the whole session, so mutating it directly
+// would leave every later gallery open working off an already-shuffled (and
+// increasingly re-shuffled) array instead of the original fetched order.
+function shuffled(array) {
+  const result = array.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 async function openPortfolioGallery(route) {
   const category = PORTFOLIO_CATEGORIES[route];
   if (!category) return;
@@ -826,9 +848,12 @@ async function openPortfolioGallery(route) {
   portfolioGalleryTitleEl.textContent = category.title;
   portfolioGalleryGridEl.innerHTML = '';
   portfolioGalleryEl.classList.remove('hidden');
+  document.body.classList.add('portfolio-open');
 
   const manifest = await getPortfolioManifest();
-  const items = manifest[category.slug] || [];
+  // Randomized per "i want it to be in randomized order" - reshuffled
+  // fresh every time the gallery's opened, not just once per page load.
+  const items = shuffled(manifest[category.slug] || []);
 
   for (const path of items) {
     const tile = document.createElement('div');
@@ -855,6 +880,11 @@ async function openPortfolioGallery(route) {
 function closePortfolioGallery() {
   portfolioGalleryEl.classList.add('hidden');
   closePortfolioLightbox();
+  // "keep the menu option in top left but open it to the right instead of
+  // down while on portfolio pages" - see style.css's body.portfolio-open
+  // rules (dark text + raised z-index so #main-menu reads over the white
+  // gallery, submenu opens sideways instead of down).
+  document.body.classList.remove('portfolio-open');
 }
 
 portfolioGalleryCloseBtn?.addEventListener('click', closePortfolioGallery);
@@ -863,10 +893,49 @@ portfolioLightboxCloseBtn?.addEventListener('click', closePortfolioLightbox);
 portfolioLightboxEl?.addEventListener('click', (e) => {
   if (e.target === portfolioLightboxEl) closePortfolioLightbox();
 });
+
+// About Me overlay - see index.html's comment on #about-overlay for why
+// this is a translucent panel over the live 3D view rather than a full
+// takeover page like the portfolio gallery above. showAboutOverlay() is
+// only ever called from updateTransition once the 'about' flight actually
+// lands (see that call site); hideAboutOverlay() is called both from the
+// close button/Escape below AND defensively at the start of every other
+// flight (startTransition/flyToLocation/startReturnToTitle) so it can't
+// linger on screen while you fly somewhere else.
+const aboutOverlayEl = document.getElementById('about-overlay');
+const aboutOverlayScrollEl = document.getElementById('about-overlay-scroll');
+const aboutOverlayCloseBtn = document.getElementById('about-overlay-close');
+const aboutBackToTopBtn = document.getElementById('about-back-to-top');
+
+function showAboutOverlay() {
+  aboutOverlayEl?.classList.remove('hidden');
+  // "open the menu horizontally on the about me page so it doesnt
+  // interact or overlap w the text" - #main-menu is already visible/on
+  // top over the translucent About panel (no z-index/color fix needed
+  // like the opaque portfolio gallery below), just the submenu's open
+  // direction changes. Shares the sideways-submenu CSS rule with
+  // body.portfolio-open, see style.css.
+  document.body.classList.add('about-open');
+}
+function hideAboutOverlay() {
+  aboutOverlayEl?.classList.add('hidden');
+  document.body.classList.remove('about-open');
+}
+aboutOverlayCloseBtn?.addEventListener('click', hideAboutOverlay);
+// "Back 2 Top" from the original page - this overlay is one scrolling
+// column (see #about-overlay's overflow-y in style.css), not paginated,
+// so this just scrolls the overlay itself back to 0 rather than the whole
+// document (which never scrolls - everything else in this app is
+// fixed/full-viewport).
+aboutBackToTopBtn?.addEventListener('click', () => {
+  aboutOverlayScrollEl?.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!portfolioLightboxEl.classList.contains('hidden')) closePortfolioLightbox();
   else if (!portfolioGalleryEl.classList.contains('hidden')) closePortfolioGallery();
+  else if (!aboutOverlayEl?.classList.contains('hidden')) hideAboutOverlay();
 });
 
 document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
@@ -1003,7 +1072,11 @@ const streetFog = scene.fog;
 const fogBaseHSL = { h: 0, s: 0, l: 0 };
 streetFog.color.getHSL(fogBaseHSL);
 const FOG_DRIFT_PERIOD = 38; // seconds per full cycle
-const FOG_DRIFT_AMOUNT = 0.1; // +/- lightness
+// Pulled back 0.1 -> 0.06 per "make the fog darker" - the drift's peak
+// (near-black -> dark-grey) was the one thing still pushing this away from
+// black on a regular cycle; narrowing it keeps the same breathing effect
+// but spends more of each cycle sitting close to true black.
+const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 
 // Debug position readout, back per your ask - for grabbing an exact spawn
 // point in FURNISHEDSCENE915.glb's coordinate space (the current spawn is
@@ -1015,7 +1088,14 @@ function updatePositionDebug() {
   if (!debugPosEl || !controls) return;
   const p = controls.camera.position;
   const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
-  let text = `x: ${p.x.toFixed(2)}\ny: ${p.y.toFixed(2)}\nz: ${p.z.toFixed(2)}\nyaw: ${yawDeg}°`;
+  // Pitch, added per "i need to be looking head angled exactly, not just
+  // the position. add more reference coordinates" - x/y/z/yaw alone can't
+  // capture a tilted-up shot like the About Me framing screenshot,
+  // LOCATIONS/flyToLocation/startTransition only ever hardcoded pitch to
+  // 0 before this. controls.pitch is radians, +/-1.2 clamp (~+/-68.7°),
+  // positive = looking up (see controls.js's drag handler).
+  const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);
+  let text = `x: ${p.x.toFixed(2)}\ny: ${p.y.toFixed(2)}\nz: ${p.z.toFixed(2)}\nyaw: ${yawDeg}°\npitch: ${pitchDeg}°`;
   text += `\nstreet: ${streetSceneStatus.state} ${streetSceneStatus.detail}`;
   debugPosEl.textContent = text;
 }
@@ -1024,6 +1104,7 @@ function tick() {
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
   flickerUniforms.uTime.value = elapsed; // drives every emissive sign's flicker shader at once, see shading.js
+  grainUniforms.uTime.value = elapsed; // re-rolls the film grain pattern every frame, see postprocessing.js
 
   // Bind the title screen's menu-sign raycast targets as soon as the street
   // mesh is in the scene - can't do this at construction time above since
@@ -1079,10 +1160,21 @@ function tick() {
     updatePositionDebug();
 
     post.tiltShiftPass.enabled = orthoActive;
+    // Distance blur - walk mode's perspective camera only, and only once
+    // it's actually rendering (not mid-flight while the ortho camera's
+    // still active during a title->walk flight's first phase) - "far
+    // away" doesn't mean anything meaningful relative to the orthographic
+    // title camera. depthPrepassPass/dofPass toggle together, see
+    // postprocessing.js's DepthPrepassPass writeup for why they're two
+    // passes instead of one.
+    post.depthPrepassPass.enabled = !orthoActive;
+    post.dofPass.enabled = !orthoActive;
     post.renderPass.camera = orthoActive ? titleScreen.camera : camera;
   } else {
     scene.fog = null;
     post.tiltShiftPass.enabled = true;
+    post.depthPrepassPass.enabled = false;
+    post.dofPass.enabled = false;
     titleScreen.update(delta);
     post.renderPass.camera = titleScreen.camera;
   }

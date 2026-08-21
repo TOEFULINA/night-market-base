@@ -165,7 +165,12 @@ export function buildWorld(scene, renderer) {
   // that distinction before ("you asked for the background specifically
   // this round, left fog as-is"), so treating this the same way rather
   // than assuming black fog implies a black background too.
-  scene.fog = new THREE.Fog(0x000000, 10, 42);
+  // "make the fog darker" - color's already pure black (0,0,0), can't go
+  // darker than that, so this reads as DENSER instead: near/far pulled in
+  // again (10/42 -> 7/32), same "steeper ramp to full opacity" move as the
+  // 32->10/55->42 pull-in above, just a second pass in the same direction.
+  // More of the street reads swallowed-black at a given distance now.
+  scene.fog = new THREE.Fog(0x000000, 7, 32);
   // Desaturated background further per "very greyish purple" - pushed the
   // same gray-blend technique from ~30% to ~65%, background only (you
   // asked for the background specifically this round, left fog as-is):

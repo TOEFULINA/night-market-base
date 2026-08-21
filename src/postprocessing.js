@@ -21,6 +21,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 
 // Title-screen-only radial defocus ("blur around the edges and farthest
 // parts, lines are too hard"). Not real depth-of-field (that needs a depth
@@ -87,6 +88,85 @@ const TILT_SHIFT_SHADER = {
   `,
 };
 
+// Distance blur ("add a blur to far away items") - real depth-of-field
+// this time, not the title screen's screen-position-based tilt-shift
+// above (that one has no idea what's actually far away in the scene, just
+// what's near the frame edges - fine for the title's fixed diagonal
+// framing, wrong for walk mode where "far" needs to mean actual distance
+// from the camera). Needs a depth texture to know that - wired up in
+// createPostProcessing below via a WebGLRenderTarget with depthTexture
+// set, which three.js populates automatically during the normal color
+// render pass (RenderPass), no separate depth pre-pass needed.
+// Same 12-tap circular blur technique as TILT_SHIFT_SHADER above, just
+// driven by linearized scene depth instead of screen-space distance from
+// center. uFocusNear/uFocusFar are in the same world units as everything
+// else in this file (meters-ish) - sharp out to uFocusNear, blur ramps in
+// smoothly and maxes out at uFocusFar. Walk-mode-only (see main.js's
+// tick() - toggled opposite of tiltShiftPass, off during the title
+// screen's orthographic view where "depth" doesn't mean the same thing).
+const DOF_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null },
+    tDepth: { value: null },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+    uCameraNear: { value: 0.1 },
+    uCameraFar: { value: 2500 },
+    uFocusNear: { value: 16 }, // sharp out to this distance
+    uFocusFar: { value: 40 }, // fully blurred by this distance - lines up with the fog's new near/far=7/32 (world.js) so distant geometry fades AND softens together
+    uStrength: { value: 2.5 }, // max blur radius in pixels
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tDepth;
+    uniform vec2 uResolution;
+    uniform float uCameraNear;
+    uniform float uCameraFar;
+    uniform float uFocusNear;
+    uniform float uFocusFar;
+    uniform float uStrength;
+    varying vec2 vUv;
+
+    float viewDistance(float depth) {
+      // Standard perspective depth -> linear view-space Z (three.js's own
+      // perspectiveDepthToViewZ formula), then flipped positive - camera
+      // looks down -Z, so viewZ comes out negative.
+      float viewZ = (uCameraNear * uCameraFar) / ((uCameraFar - uCameraNear) * depth - uCameraFar);
+      return -viewZ;
+    }
+
+    void main() {
+      float depth = texture2D(tDepth, vUv).x;
+      float dist = viewDistance(depth);
+      float blurAmount = smoothstep(uFocusNear, uFocusFar, dist);
+
+      if (blurAmount <= 0.001) {
+        gl_FragColor = texture2D(tDiffuse, vUv);
+        return;
+      }
+
+      vec2 texel = 1.0 / uResolution;
+      float radius = blurAmount * uStrength;
+      const int SAMPLES = 12;
+      vec4 sum = texture2D(tDiffuse, vUv) * 2.0;
+      float total = 2.0;
+      for (int i = 0; i < SAMPLES; i++) {
+        float angle = (float(i) / float(SAMPLES)) * 6.28318;
+        vec2 offset = vec2(cos(angle), sin(angle)) * radius * texel;
+        sum += texture2D(tDiffuse, vUv + offset);
+        total += 1.0;
+      }
+      gl_FragColor = sum / total;
+    }
+  `,
+};
+
 // Shadow lift - "keep the same overall brightness but decrease the
 // intensity of the darks, it's all too dark where it's dark." A straight
 // exposure bump would brighten everything including the parts that are
@@ -123,10 +203,115 @@ const SHADOW_LIFT_SHADER = {
   `,
 };
 
+// Grain + contrast, both always-on/both-modes like the shadow lift above,
+// and combined into one pass rather than two separate ShaderPasses - one
+// less full-screen texture read/write per frame for two effects that are
+// both simple per-pixel math anyway, no reason to pay for a second pass.
+// Runs LAST (after OutputPass/shadowLiftPass), same reasoning as the
+// shadow lift: grades the final display-ready image, not the linear
+// scene-referred values.
+//
+// Contrast: "slight reduction of contrast" - classic pivot-around-0.5
+// contrast formula with uContrast slightly under 1 (0.92) pulls both ends
+// of the range in toward mid-grey a little, without touching overall
+// brightness (0.5 stays 0.5).
+//
+// Grain: "a slight grain to the entire scene" - per-pixel pseudo-random
+// noise (a cheap hash of screen position, no texture lookup needed),
+// re-rolled every frame via uTime so it reads as film grain/sensor noise
+// rather than a static dither pattern burned into the image. uTime comes
+// from the shared grainUniforms object below, same pattern as
+// shading.js's flickerUniforms - ONE uniform object, updated once per
+// frame in main.js's tick(), rather than each pass tracking its own
+// clock. Amount kept low (0.035) - visible as texture/grit up close,
+// not full VHS noise.
+export const grainUniforms = { uTime: { value: 0 } };
+
+const GRAIN_CONTRAST_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: grainUniforms.uTime,
+    uContrast: { value: 0.92 },
+    uGrainAmount: { value: 0.035 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uContrast;
+    uniform float uGrainAmount;
+    varying vec2 vUv;
+
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      color.rgb = (color.rgb - 0.5) * uContrast + 0.5;
+
+      float grain = hash(vUv * vec2(1000.0, 1000.0) + uTime) - 0.5;
+      color.rgb += grain * uGrainAmount;
+
+      gl_FragColor = color;
+    }
+  `,
+};
+
+// Dedicated depth pre-pass for DOF_SHADER - deliberately NOT done by
+// handing EffectComposer a custom renderTarget with a depthTexture
+// attached (the "usual" three.js trick). That relies on RenderPass always
+// landing on the SAME physical render target every frame, but this
+// composer's tiltShiftPass/dofPass toggle on/off by mode (see main.js's
+// tick()), and EffectComposer skips both the render AND the buffer-swap
+// entirely for a disabled pass - so which of its two ping-pong buffers is
+// "current" at frame start drifts depending on how many passes were
+// enabled the frame before. A depth texture attached to one fixed buffer
+// would end up stale/wrong on some frames as that drift happens - a subtle
+// bug that'd show up as the blur boundary lagging a frame behind, not an
+// outright crash. Simplest correct fix: render depth into its own
+// completely separate, fixed target every frame, outside the composer's
+// ping-pong entirely. needsSwap = false, so this never touches the main
+// color chain - it's a pure side effect (populate the depth texture) that
+// the DOF pass right after it reads from.
+class DepthPrepassPass extends Pass {
+  constructor(scene, camera, depthTarget) {
+    super();
+    this.scene = scene;
+    this.camera = camera;
+    this.depthTarget = depthTarget;
+    this.needsSwap = false;
+  }
+  render(renderer) {
+    const prevTarget = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.depthTarget);
+    renderer.render(this.scene, this.camera);
+    renderer.setRenderTarget(prevTarget);
+  }
+}
+
 export function createPostProcessing(renderer, scene, camera) {
   const composer = new EffectComposer(renderer);
   composer.setPixelRatio(renderer.getPixelRatio());
   composer.setSize(window.innerWidth, window.innerHeight);
+
+  // DOF_SHADER's depth source - see DepthPrepassPass above for why this is
+  // a separate target rather than the composer's own. Walk mode's
+  // perspective camera only (DOF is walk-only, see main.js's tick() -
+  // title mode never enables depthPrepassPass/dofPass, so this target
+  // just sits unused/free at zero extra cost while on the title screen).
+  const depthTexture = new THREE.DepthTexture();
+  depthTexture.type = THREE.UnsignedIntType;
+  const depthTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+    depthTexture,
+    depthBuffer: true,
+  });
 
   // camera is reassigned per-frame in main.js (title screen's orthographic
   // camera vs. the walk mode perspective camera share this one composer/
@@ -165,6 +350,22 @@ export function createPostProcessing(renderer, scene, camera) {
   tiltShiftPass.enabled = false;
   composer.addPass(tiltShiftPass);
 
+  // Walk-mode-only distance blur, see DOF_SHADER/DepthPrepassPass above.
+  // depthPrepassPass MUST run immediately before dofPass (it just fills in
+  // the texture dofPass reads that same frame) - both start disabled and
+  // get toggled together, opposite of tiltShiftPass, in main.js's tick().
+  const depthPrepassPass = new DepthPrepassPass(scene, camera, depthTarget);
+  depthPrepassPass.enabled = false;
+  composer.addPass(depthPrepassPass);
+
+  const dofPass = new ShaderPass(DOF_SHADER);
+  dofPass.uniforms.tDepth.value = depthTexture;
+  dofPass.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+  dofPass.uniforms.uCameraNear.value = camera.near;
+  dofPass.uniforms.uCameraFar.value = camera.far;
+  dofPass.enabled = false;
+  composer.addPass(dofPass);
+
   // Required as the last pass whenever EffectComposer is in the picture at
   // all - applies the renderer's actual tone mapping (ACES, see main.js)
   // and output color space to the final composited image. Without this,
@@ -177,15 +378,25 @@ export function createPostProcessing(renderer, scene, camera) {
   const shadowLiftPass = new ShaderPass(SHADOW_LIFT_SHADER);
   composer.addPass(shadowLiftPass);
 
+  // Grain + contrast, see GRAIN_CONTRAST_SHADER above - always on, both
+  // modes, runs last of all so it grades the fully composited image.
+  const grainContrastPass = new ShaderPass(GRAIN_CONTRAST_SHADER);
+  composer.addPass(grainContrastPass);
+
   return {
     composer,
     renderPass,
     bloomPass,
     tiltShiftPass,
+    depthPrepassPass,
+    dofPass,
     shadowLiftPass,
+    grainContrastPass,
     setSize(width, height) {
       composer.setSize(width, height);
       tiltShiftPass.uniforms.uResolution.value.set(width, height);
+      dofPass.uniforms.uResolution.value.set(width, height);
+      depthTarget.setSize(width, height);
     },
   };
 }

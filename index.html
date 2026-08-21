@@ -132,8 +132,17 @@
        (real export filenames), not hardcoded here. -->
   <div id="portfolio-gallery" class="hidden">
     <button id="portfolio-gallery-close" aria-label="Close">&times;</button>
+    <!-- Title stays a direct (non-scrolling) child of #portfolio-gallery -
+         "one part of the site at the top should stay anchored so it
+         doesnt just feel like its scaled weird": with the grid below now a
+         fixed 2800px-wide canvas that scrolls in all 4 directions, the
+         title needs to stay pinned at a fixed screen position instead of
+         scrolling away with the grid, same anchor-point role the top-left
+         #main-menu already plays elsewhere. -->
     <h2 id="portfolio-gallery-title"></h2>
-    <div id="portfolio-gallery-grid"></div>
+    <div id="portfolio-gallery-scroll">
+      <div id="portfolio-gallery-grid"></div>
+    </div>
   </div>
 
   <!-- Lightbox - full-size view of whatever tile you click in the grid
@@ -143,6 +152,168 @@
   <div id="portfolio-lightbox" class="hidden">
     <button id="portfolio-lightbox-close" aria-label="Close">&times;</button>
     <div id="portfolio-lightbox-content"></div>
+  </div>
+
+  <!-- About Me overlay - unlike the portfolio gallery (a full opaque page),
+       this is a semi-transparent panel over the live 3D "About" camera
+       view (see LOCATIONS.about in main.js), per your own mockup: the
+       scene/character stay visible through/beside it, not covered by a
+       solid backdrop. Shown once the About flight lands (main.js), closed
+       via the X/Escape/backdrop click same as the other overlays. Content
+       is the real text from your current toefu888.com/about-me export -
+       Resume link, Rates sheet link, and the 6 client thumbnails still
+       need the actual files/images from you (see the TODO comments below
+       each one) - left as clearly-labeled placeholders rather than fake
+       links or borrowed images. -->
+  <div id="about-overlay" class="hidden">
+    <button id="about-overlay-close" aria-label="Close">&times;</button>
+    <!-- Scroll/clip boundary lives on THIS wrapper, not #about-overlay
+         itself - "when i scroll i want all the text on there to cut off
+         below the logo like an invisible border": #about-overlay-scroll
+         starts at top:120px (just under #main-menu-logo's 40px+64px box)
+         and is its own overflow:auto box, so anything scrolling up gets
+         clipped at ITS OWN top edge across the full width, not just
+         wherever the logo icon itself happens to sit. #about-overlay
+         above it stays a plain non-scrolling backdrop tint + the fixed
+         close button. -->
+    <div id="about-overlay-scroll">
+      <div id="about-overlay-content">
+        <!-- "move the about me and stuff over so theres room for a
+             profile pic" - profile-pic box lines up with the left column
+             (same 300px width as .about-columns below, so the photo sits
+             directly above the contact-list column), header text moved
+             into the matching right cell instead of spanning full width.
+             TODO: no profile photo file provided yet (only a mockup
+             screenshot) - placeholder box below, swap its background/img
+             once you send the actual image. -->
+        <div class="about-header-row">
+          <!-- Cropped from your own toefu888.com/about-me avatar (couldn't
+               pull the original wixstatic.com file directly - that domain
+               isn't reachable from this sandbox - so this is a crop of
+               the screenshot you sent, not the source file. Send the
+               actual image if you want a sharper version in here. -->
+          <div class="about-profile-pic"><img src="/about/profile-pic.jpg" alt="Lina (Toefu)" /></div>
+          <div class="about-header">
+            <h1>About Me</h1>
+            <h2>Lina (Toefu)</h2>
+            <p>Hello! I am Lina, a NYC-based visual artist with almost 10 years of experience. I specialize in all things graphic - anywhere from illustration to action figures (and anything in between).</p>
+            <p>I am available for hire on a project to project basis or monthly contract.</p>
+            <p>Contact me for any business inquiries! Price and structure are negotiable per client. :)</p>
+          </div>
+        </div>
+
+        <!-- Two-column "Facebook profile" layout per your call: left =
+             links + the CLIENTS "photos" grid + SKILLS/APPLICATIONS tag
+             lists (the static intro-sidebar stuff), right = RATES/WORK
+             EXPERIENCE/SKILLS AND APPLICATIONS/PERSONAL INTERESTS as a
+             stacked feed of "update" boxes. -->
+        <div class="about-columns">
+          <div class="about-col-left">
+            <ul class="about-contact-list">
+              <li class="about-contact-location">Manhattan, NY</li>
+              <!-- Real resume PDF, pulled from your live toefu888.com/about-me page. -->
+              <li><a href="https://www.toefu888.com/_files/ugd/4ddd2b_957e41760be544e493c53f524993f088.pdf" target="_blank" rel="noopener noreferrer">Resume</a></li>
+              <li><a href="https://instagram.com/toefulina" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+              <li><a href="https://twitter.com/LUVsicHEXALOGY" target="_blank" rel="noopener noreferrer">Twitter</a></li>
+              <li><a href="https://www.linkedin.com/in/miuppa/" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+            </ul>
+
+            <h3 class="about-section-label">Clients</h3>
+            <!-- Cropped from your live toefu888.com/about-me screenshot,
+                 same source-access note as the profile pic above. -->
+            <div class="about-clients-grid">
+              <div class="about-client-tile" style="background-image: url('/about/client-1.jpg')"></div>
+              <div class="about-client-tile" style="background-image: url('/about/client-2.jpg')"></div>
+              <div class="about-client-tile" style="background-image: url('/about/client-3.jpg')"></div>
+              <div class="about-client-tile" style="background-image: url('/about/client-4.jpg')"></div>
+              <div class="about-client-tile" style="background-image: url('/about/client-5.jpg')"></div>
+              <div class="about-client-tile" style="background-image: url('/about/client-6.jpg')"></div>
+            </div>
+
+            <div class="about-tag-box">
+              <h4>Skills</h4>
+              <ul class="about-skills-list">
+                <li>Adobe Suite</li>
+                <li>3D modeling &amp; texturing</li>
+                <li>Illustration</li>
+                <li>Tech Pack Production</li>
+                <li>3D Scanning &amp; Printing</li>
+                <li>Font/Typography Design</li>
+                <li>GENAI Integration</li>
+                <li>Motion Graphics</li>
+                <li>Photo Retouching</li>
+              </ul>
+            </div>
+
+            <div class="about-tag-box">
+              <h4>Applications</h4>
+              <ul class="about-skills-list">
+                <li>Ads &amp; Marketing Assets</li>
+                <li>Social Media Graphics</li>
+                <li>Product Design &amp; Packaging Design</li>
+                <li>PDP &amp; Web-ready Commercial Graphics</li>
+                <li>Action Figure / Toy Design</li>
+                <li>Web Design</li>
+                <li>Cover Art</li>
+                <li>Concept Mockups</li>
+                <li>Lyric Videos</li>
+                <li>One Sheets</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="about-col-right">
+            <div class="about-box">
+              <h3>Rates</h3>
+              <p class="about-updated">Updated 3/7/25</p>
+              <p>Rates are negotiable per client, but I have a consolidated preview sheet of starting rates attached here:</p>
+              <!-- Real rates page, pulled from your live toefu888.com/about-me page. -->
+              <a class="about-box-button" href="https://www.toefu888.com/rates" target="_blank" rel="noopener noreferrer">Rates</a>
+            </div>
+
+            <div class="about-box">
+              <h3>Work Experience</h3>
+              <p class="about-updated">Updated 3/7/25</p>
+              <div class="about-job">
+                <p class="about-job-title">Freelance</p>
+                <p class="about-job-dates">Jan 2018 - Current</p>
+                <p>Specializing in creative direction, illustration, graphic design, merch design, logo design, animation, and 3D Rendering. Clients include Quavo, Anycia, Dess Dior, Kid Cudi, TRGC, Redbull, Warner, Live Nation, and more.</p>
+              </div>
+              <div class="about-job">
+                <p class="about-job-title">Bravest Studios</p>
+                <p class="about-job-dates">Apr 2024 - Current</p>
+                <p>Primary in-house graphic and 3d designer for Bravest Studios. Handles a wide range of deliverables including graphic design, brand identity, clothing design, 3d modeling, physical prototyping, animation, and more.</p>
+              </div>
+              <div class="about-job">
+                <p class="about-job-title">Outback Presents</p>
+                <p class="about-job-dates">Nov 2021 - Feb 2023</p>
+                <p>Oversaw and executed all graphic design work for signed artists on the Good Partners label, sub-company of tour promoter Outback Presents. Project management for up to 10 artists at a time including: project creative direction and marketing, tour support, and promotional assets (cover art, tour posters, billboard design, social media assets, merchandise like action figures, rugs, and toys).</p>
+              </div>
+            </div>
+
+            <div class="about-box">
+              <h3>Skills and Applications</h3>
+              <p class="about-updated">Updated 3/7/25</p>
+              <p>The skills/applications lists to the left are the most common commission requests I work on, and the most common medium types I use on those requests. Not the only things I work on. Feel free to pitch me something beyond that :)</p>
+            </div>
+
+            <div class="about-box">
+              <h3>Personal Interests</h3>
+              <p class="about-updated">Updated 5/20/25</p>
+              <p>Nice thanks for making it all the way to the bottom :) I get to tell you about my hobbies here!</p>
+              <p>In my free time, I love playing games, doing elaborate nail art, and making self portraits. I really don't have much else to say LOL what I do for a living is my biggest hobby.</p>
+            </div>
+          </div>
+        </div>
+
+        <button id="about-back-to-top" class="about-box-button">Back 2 Top</button>
+
+        <div class="about-footer">
+          <p>Toefu LLC</p>
+          <p>Lina Art</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

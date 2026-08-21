@@ -977,12 +977,19 @@ const streetFog = scene.fog;
 // "slightly dynamic" - a slow, subtle lightness breathe on the fog color,
 // not a hue change. Base HSL pulled from the color world.js just set
 // (0x4c4657) rather than hardcoded again here, so this stays in sync if
-// that ever changes. Amplitude is small on purpose ("slightly") - +/-4%
-// lightness over a ~38s period reads as gentle drift, not a strobe.
+// that ever changes. Amplitude bumped 0.04 -> 0.1 per "slightly less
+// black, maybe multi colors? like some black some dark grey in the fog" -
+// clarified as shades of grey, not literal hue variation, so this stays a
+// pure lightness drift (h/s still locked to base). With the fog now black
+// (l=0), the sine still swings +/-0.1 but negative lightness just clamps
+// back to black, so in practice this reads as breathing between black and
+// a clearly-dark-grey (l up to ~0.1) rather than two shades of near-black -
+// the "some black, some dark grey" look, just automatic instead of
+// hand-picking two colors to alternate between.
 const fogBaseHSL = { h: 0, s: 0, l: 0 };
 streetFog.color.getHSL(fogBaseHSL);
 const FOG_DRIFT_PERIOD = 38; // seconds per full cycle
-const FOG_DRIFT_AMOUNT = 0.04; // +/- lightness
+const FOG_DRIFT_AMOUNT = 0.1; // +/- lightness
 
 // Debug position readout, back per your ask - for grabbing an exact spawn
 // point in FURNISHEDSCENE915.glb's coordinate space (the current spawn is

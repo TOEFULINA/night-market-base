@@ -84,15 +84,19 @@ export function initKtx2Loader(renderer) {
   ktx2Loader.detectSupport(renderer);
 }
 
+// Loading-screen redesign per "use the same menu icon in the middle on a
+// white background... standalone percentage number in helvetica instead of
+// a loading bar" - #loading-bar/#loading-label swapped for a single
+// #loading-percent element (the wobble on #loading-logo is pure CSS, see
+// style.css, nothing to drive from here). Still just text content updates
+// on the same manager.onProgress tick, same shape as the old bar-width one.
 export function initLoadingUI(onComplete) {
-  const bar = document.getElementById('loading-bar');
-  const label = document.getElementById('loading-label');
+  const percent = document.getElementById('loading-percent');
   const screen = document.getElementById('loading-screen');
 
   manager.onProgress = (url, loaded, total) => {
     const pct = total ? Math.round((loaded / total) * 100) : 0;
-    if (bar) bar.style.width = `${pct}%`;
-    if (label) label.textContent = `loading market… ${pct}%`;
+    if (percent) percent.textContent = `${pct}%`;
   };
 
   manager.onLoad = () => {

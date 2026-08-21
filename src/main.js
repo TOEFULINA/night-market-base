@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Controls } from './controls.js';
-import { buildWorld, streetSceneStatus, streetScene } from './world.js';
+import { buildWorld, streetSceneStatus, streetScene, albumCoverPlanes, recordDiscRef } from './world.js';
 import { initLoadingUI } from './loader.js';
 import { TitleScreen } from './titleScreen.js';
 import { createPostProcessing, grainUniforms } from './postprocessing.js';
@@ -93,6 +93,8 @@ let controls = null;
 let signsBound = false;
 let vinylInteraction = null;
 let vinylBound = false;
+let coverPlanesBound = false;
+let recordDiscBound = false;
 // "popping up when you enter any of the explore mode spaces for the first
 // time" - set the instant the FIRST title->walk flight starts (startTransition
 // below), so a rapid double-click can't queue it twice; the bubble itself
@@ -105,6 +107,7 @@ let hasEnteredWalkModeBefore = false;
 
 const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
+const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
 
 // Vinyl sample booth - "i want to be able to play songs and swap out the
 // cover. like a booth where u can sample." Filler content for now ("can
@@ -113,41 +116,93 @@ vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 // naming scheme real ones would use, so swapping in real content later is
 // just replacing these files and updating title/artist text, no code
 // changes needed.
+// Real tracks - titles/artists parsed from the uploaded filenames ("song
+// name - artist" per your correction). Covers still point at the filler
+// placeholders (cover-1..4.jpg, cycling) until the real cover art arrives -
+// swap those paths in per-track once it does. Audio trimmed to a 30s max
+// clip (ffmpeg -t 30, re-encoded AAC 128k) - a few of the shorter ones
+// (8 Feet Tall, Idiot, Put Up, Smoke You Out) were already under 30s so
+// they're kept at their full original length instead of padded out.
+// One note: you sent two files for the same song ("TELL ME NOW - DESS DIOR
+// & BELLY GANG .m4a", 26s, and "Tell Me Now - Dess Dior & Belly Gang
+// Kushington.m4a", 31s) - used the second/longer one since its artist
+// credit looked more complete ("Kushington" spelled out); flag if that's
+// the wrong pick and I'll swap in the other one instead.
 const VINYL_TRACKS = [
-  { title: 'Track One', artist: 'Filler Artist', cover: '/covers/cover-1.jpg', audio: '/audio/sample-1.wav' },
-  { title: 'Track Two', artist: 'Filler Artist', cover: '/covers/cover-2.jpg', audio: '/audio/sample-2.wav' },
-  { title: 'Track Three', artist: 'Filler Artist', cover: '/covers/cover-3.jpg', audio: '/audio/sample-3.wav' },
-  { title: 'Track Four', artist: 'Filler Artist', cover: '/covers/cover-4.jpg', audio: '/audio/sample-4.wav' },
+  { title: '8 Feet Tall', artist: 'ErisThePlanet & Rico Nasty', cover: '/covers/8-feet-tall.jpg', audio: '/audio/sample-1.m4a' },
+  { title: 'Burning Rubber', artist: 'Jordan Ward & Joony', cover: '/covers/burning-rubber.jpg', audio: '/audio/sample-2.m4a' },
+  { title: 'Classy', artist: 'Joony & Tony Shhnow', cover: '/covers/classy.jpg', audio: '/audio/sample-3.m4a' },
+  { title: 'Geezer', artist: 'ErisThePlanet', cover: '/covers/geezer.jpg', audio: '/audio/sample-4.m4a' },
+  { title: 'Idiot', artist: 'Estelle Allen', cover: '/covers/idiot.jpg', audio: '/audio/sample-5.m4a' },
+  { title: 'JJK', artist: 'Yuki Chiba & MGK', cover: '/covers/jjk.jpg', audio: '/audio/sample-6.m4a' },
+  { title: 'Need It', artist: 'Joony', cover: '/covers/need-it.jpg', audio: '/audio/sample-7.m4a' },
+  { title: 'No Chill', artist: 'Joony', cover: '/covers/no-chill.jpg', audio: '/audio/sample-8.m4a' },
+  { title: 'OOOOOO', artist: 'Joony', cover: '/covers/oooooo.jpg', audio: '/audio/sample-9.m4a' },
+  { title: 'Pimpin', artist: 'Joony, Larry June & Isaiah Falls', cover: '/covers/pimpin.jpg', audio: '/audio/sample-10.m4a' },
+  { title: 'Put Up', artist: 'Anycia & Quavo', cover: '/covers/put-up.jpg', audio: '/audio/sample-11.m4a' },
+  { title: 'Smoke You Out', artist: 'Anycia & Kalan.FrFr', cover: '/covers/smoke-you-out.jpg', audio: '/audio/sample-12.m4a' },
+  { title: 'Tell Me Now', artist: 'Dess Dior & Belly Gang Kushington', cover: '/covers/tell-me-now.jpg', audio: '/audio/sample-13.m4a' },
+  { title: 'Wassup', artist: 'Key! & DRAM', cover: '/covers/wassup.jpg', audio: '/audio/sample-14.m4a' },
+  { title: 'We Got That', artist: 'Black Moss', cover: '/covers/we-got-that.jpg', audio: '/audio/sample-15.m4a' },
+  { title: 'Zendaya', artist: 'Chris Patrick', cover: '/covers/zendaya.jpg', audio: '/audio/sample-16.m4a' },
+  { title: 'Zombie', artist: 'Estelle Allen', cover: '/covers/zombie.jpg', audio: '/audio/sample-17.m4a' },
 ];
 
 const vinylBoothEl = document.getElementById('vinyl-booth');
-const vinylBoothCoverWrapEl = document.getElementById('vinyl-booth-cover-wrap');
-const vinylBoothCoverEl = document.getElementById('vinyl-booth-cover');
 const vinylBoothTitleEl = document.getElementById('vinyl-booth-title');
 const vinylBoothArtistEl = document.getElementById('vinyl-booth-artist');
 const vinylBoothPlayBtn = document.getElementById('vinyl-booth-play');
 const vinylBoothAudioEl = document.getElementById('vinyl-booth-audio');
 let vinylTrackIndex = 0;
 
-// Loads a track into the booth UI (cover/title/artist/audio src) and
-// optionally starts it playing. `replayDrop` is false for the very first
-// track (the record already dropped as part of approaching/locking in,
-// see vinylInteraction.js's _lockIn) and true for every subsequent swap
-// (a "new record" going on, so it drops again).
+// "these are going to serve as the cover" - the floating 2D UI cover card
+// is gone (see world.js's albumCoverPlanes writeup); cover art now lands
+// as a texture directly on the two mesh planes sitting at the record
+// player. One shared loader/cache so flipping back and forth between the
+// same few filler tracks doesn't refetch the image every time.
+const coverTextureLoader = new THREE.TextureLoader();
+const coverTextureCache = new Map();
+function loadCoverTexture(url) {
+  if (coverTextureCache.has(url)) return coverTextureCache.get(url);
+  const tex = coverTextureLoader.load(url);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // "UVs are rotated and mirrored, should be turned once counterclockwise
+  // and mirrored" - the ALBUM_COVERS.glb planes' own UVs come in off from
+  // whatever orientation Blender's plane primitive uses by default. Fixing
+  // it on the texture (rotate around its own center, then flip U) instead
+  // of touching the mesh UVs directly - keeps this self-contained to
+  // cover art specifically, doesn't risk the plane geometry itself.
+  tex.wrapS = THREE.RepeatWrapping; // needed for the negative repeat.x flip below
+  tex.center.set(0.5, 0.5);
+  tex.rotation = (3 * Math.PI) / 2; // "rotate counterclockwise twice" more on top of the first 90° - 270° total
+  tex.repeat.x = -1; // mirror horizontally
+  coverTextureCache.set(url, tex);
+  return tex;
+}
+// "current" plane shows the track actually loaded; "next" previews
+// whatever loadVinylTrack(index+1) would land on, so the booth's ">"
+// button isn't a total surprise.
+function applyCoverPlaneTextures() {
+  const currentTrack = VINYL_TRACKS[vinylTrackIndex];
+  const nextTrack = VINYL_TRACKS[(vinylTrackIndex + 1) % VINYL_TRACKS.length];
+  if (albumCoverPlanes.current) albumCoverPlanes.current.material.map = loadCoverTexture(currentTrack.cover);
+  if (albumCoverPlanes.next) albumCoverPlanes.next.material.map = loadCoverTexture(nextTrack.cover);
+  if (albumCoverPlanes.current) albumCoverPlanes.current.material.needsUpdate = true;
+  if (albumCoverPlanes.next) albumCoverPlanes.next.material.needsUpdate = true;
+}
+
+// Loads a track into the booth UI (title/artist/audio src + the two cover
+// mesh planes) and optionally starts it playing. `replayDrop` is false for
+// the very first track (the record already dropped as part of approaching/
+// locking in, see vinylInteraction.js's _lockIn) and true for every
+// subsequent swap (a "new record" going on, so it drops again).
 function loadVinylTrack(index, { replayDrop = true, autoplay = true } = {}) {
   vinylTrackIndex = ((index % VINYL_TRACKS.length) + VINYL_TRACKS.length) % VINYL_TRACKS.length;
   const track = VINYL_TRACKS[vinylTrackIndex];
 
-  vinylBoothCoverEl.src = track.cover;
   vinylBoothTitleEl.textContent = track.title;
   vinylBoothArtistEl.textContent = track.artist;
-
-  // Restart the cover-in animation - remove the class, force a reflow
-  // (reading offsetWidth), then add it back, since just re-adding an
-  // already-present class doesn't re-trigger a CSS animation on its own.
-  vinylBoothCoverWrapEl.classList.remove('vinyl-booth-cover-animate');
-  void vinylBoothCoverWrapEl.offsetWidth;
-  vinylBoothCoverWrapEl.classList.add('vinyl-booth-cover-animate');
+  applyCoverPlaneTextures();
 
   if (replayDrop) vinylInteraction?.replayDrop();
 
@@ -170,6 +225,13 @@ vinylBoothPlayBtn?.addEventListener('click', () => {
 });
 vinylBoothAudioEl?.addEventListener('play', updateVinylPlayButton);
 vinylBoothAudioEl?.addEventListener('pause', updateVinylPlayButton);
+// "can we have the single vinyl on top of the player spin while music
+// plays too" - vinylInteraction.js owns the actual per-frame rotation
+// (setSpinning just flips a flag it reads in its own update() loop);
+// 'ended' covers a clip finishing on its own without a manual pause.
+vinylBoothAudioEl?.addEventListener('play', () => vinylInteraction?.setSpinning(true));
+vinylBoothAudioEl?.addEventListener('pause', () => vinylInteraction?.setSpinning(false));
+vinylBoothAudioEl?.addEventListener('ended', () => vinylInteraction?.setSpinning(false));
 
 const welcomeBubbleEl = document.getElementById('welcome-bubble');
 const WELCOME_BUBBLE_AUTO_DISMISS_MS = 8000;
@@ -500,14 +562,27 @@ function startTransition(routeKey) {
   // walkaround" button (top right, see index.html/style.css) per your
   // ask - Escape already exited this view, but nothing on screen told you
   // that was possible, so this makes the same exit visible/clickable.
+  // Fresh instance above means a fresh (null) target - vinylBound gates the
+  // tick loop's bindTarget() call (see below), so without resetting it here
+  // every re-entry into walk mode after the first would silently skip
+  // rebinding forever: the flag would already read true from the FIRST
+  // entry, even though THIS instance has never had bindTarget() called on
+  // it. Exactly the "works once, dead after you go back" bug - the record
+  // player becomes permanently unclickable the moment you leave and
+  // re-enter walk mode, since target stays null with no code path left to
+  // fix it.
+  vinylBound = false;
+  recordDiscBound = false; // same reasoning as vinylBound above, for bindDisc()
   vinylInteraction = new VinylInteraction(camera, renderer.domElement, controls, {
     onLocked: () => {
       vinylExitBtn?.classList.remove('hidden');
+      vinylDebugPosEl?.classList.remove('hidden');
       vinylBoothEl?.classList.remove('hidden');
       loadVinylTrack(0, { replayDrop: false });
     },
     onUnlocked: () => {
       vinylExitBtn?.classList.add('hidden');
+      vinylDebugPosEl?.classList.add('hidden');
       vinylBoothEl?.classList.add('hidden');
       vinylBoothAudioEl.pause();
     },
@@ -1252,6 +1327,27 @@ function tick() {
     vinylInteraction.bindTarget(streetScene);
     vinylBound = true;
   }
+  // Cover mesh planes load from their own tiny standalone GLB (world.js's
+  // albumCoverPlanes), independently of the street scene/vinylBound above -
+  // sync whatever track loadVinylTrack last set (or the default, index 0,
+  // if it hasn't fired yet) the moment both planes are ready, in case
+  // onLocked's loadVinylTrack(0) call raced ahead of this tiny file's load.
+  if (!coverPlanesBound && albumCoverPlanes.current && albumCoverPlanes.next) {
+    applyCoverPlaneTextures();
+    coverPlanesBound = true;
+  }
+  // Record disc - same lazy-bind pattern, own standalone file (world.js's
+  // recordDiscRef), independent of the street scene/vinylBound above. Also
+  // gated on vinylInteraction actually existing (same as vinylBound above,
+  // not just coverPlanesBound below) - it only exists once you're in walk
+  // mode, and marking this bound without it existing yet would skip the
+  // real bindDisc() call forever once it finally does. See
+  // vinylInteraction.js's bindDisc() for why this replaced the old
+  // getObjectByName(Counter_Cube.001) lookup.
+  if (vinylInteraction && !recordDiscBound && recordDiscRef.mesh) {
+    vinylInteraction.bindDisc(recordDiscRef.mesh);
+    recordDiscBound = true;
+  }
 
   // Orbs/smoke/stars - moved out of the walk-only branch so the stars
   // actually twinkle on the title screen too (that's specifically what got
@@ -1287,6 +1383,14 @@ function tick() {
     const orthoActive = updateTransition(delta);
     controls?.update(delta); // null for one frame if a Home flight just finished above - no-ops itself while locked either way
     vinylInteraction?.update(delta); // no-ops unless a lock-in/out transition is in progress
+    // Temporary - live camera position while locked in, so you can read a
+    // number straight off the screen instead of me guessing at
+    // LOCK_CAMERA_OFFSET again. Only updates while the readout is actually
+    // visible (locked in) - see index.html's comment on #vinyl-debug-pos.
+    if (vinylInteraction?.locked && vinylDebugPosEl) {
+      const p = camera.position;
+      vinylDebugPosEl.textContent = `x ${p.x.toFixed(2)}\ny ${p.y.toFixed(2)}\nz ${p.z.toFixed(2)}`;
+    }
     updateExploreNavVisibility(); // hides the </> arrows the moment you move away from an Explore spot
 
     post.tiltShiftPass.enabled = orthoActive;

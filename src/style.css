@@ -465,54 +465,58 @@ body.about-open #main-menu-list {
 #vinyl-exit-btn:hover { opacity: 1; }
 #vinyl-exit-btn.hidden { display: none; }
 
+/* Temporary - live camera-position readout while locked into the vinyl
+   view, see index.html's comment above #vinyl-debug-pos for why. */
+#vinyl-debug-pos {
+  position: fixed;
+  top: 70px;
+  right: 40px;
+  z-index: 13;
+  color: #fff;
+  font-family: 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  background: rgba(5, 6, 10, 0.7);
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: pre;
+}
+#vinyl-debug-pos.hidden { display: none; }
+
 /* Vinyl sample booth - bottom-center while locked into the record player
    (see #vinyl-exit-btn above for the exit button this sits alongside).
    Dark translucent card, same flat white-on-dark chrome language as the
-   rest of the corner UI, just centered/bottom instead of a corner since
-   this is the main interactive focus of this view rather than
-   incidental nav. */
+   rest of the corner UI. The cover art card that used to live here is
+   gone - "these are going to serve as the cover" - cover art is now a
+   texture on the two mesh planes at the record player instead (see
+   world.js's albumCoverPlanes, main.js's applyCoverPlaneTextures), so this
+   is just the title/artist/controls panel now. #vinyl-booth itself is
+   just a hide/show wrapper (display:contents so it doesn't impose its
+   own box/positioning). */
 #vinyl-booth {
+  display: contents;
+}
+#vinyl-booth.hidden #vinyl-booth-panel {
+  display: none;
+}
+
+/* Player panel - title/artist + transport controls, dark card anchored
+   near the bottom (over where the physical record player sits). */
+#vinyl-booth-panel {
   position: fixed;
   left: 50%;
   bottom: 40px;
   transform: translateX(-50%);
   z-index: 13;
+  width: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 20px 28px;
+  gap: 10px;
+  padding: 14px 16px;
   background: rgba(5, 6, 10, 0.7);
   border-radius: 6px;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   color: #fff;
-}
-#vinyl-booth.hidden { display: none; }
-
-#vinyl-booth-cover-wrap {
-  width: 120px;
-  height: 120px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #111;
-}
-#vinyl-booth-cover {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* "like the image of the cover animate in" - JS restarts this animation
-   on every track swap (remove the class, force reflow, add it back) by
-   toggling .vinyl-booth-cover-animate on the wrap, not on the <img>
-   itself, so a fast double-click re-triggers cleanly instead of the
-   browser no-op-ing an already-running animation on the same element. */
-#vinyl-booth-cover-wrap.vinyl-booth-cover-animate #vinyl-booth-cover {
-  animation: vinylCoverIn 0.45s ease;
-}
-@keyframes vinylCoverIn {
-  from { opacity: 0; transform: scale(0.85); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 #vinyl-booth-info { text-align: center; }

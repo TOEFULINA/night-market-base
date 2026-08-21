@@ -39,21 +39,27 @@ import * as THREE from 'three';
 // this feature was first built - the isMesh check would have looked
 // correct in review but the name lookup itself was always failing first.
 export const RECORD_PLAYER_NODE_NAME = 'RecordPlayer_Cube070';
-// The record disc itself - "i also added a record on the vinyl that can be
-// shown when the record player is clicked on." Node identity confirmed
-// directly, not guessed: your standalone "justvinyle.glb" upload is a
-// single node named Counter_Cube.001 with an exact translation/rotation/
-// scale match to the node of the same name already sitting in
-// TRY7_SCENE.glb's full scene, so that's unambiguously the same object.
-// Its material is VynilMaterial.004 too - the same name this codebase
-// already tracks as "the vinyl records material" (the one HD exceptions
-// apply to elsewhere in world.js), which lines up with "the vinyl" being
-// exactly what this node is. Hidden by default (see toUnlitFlat traversal
-// in world.js) and toggled visible for the duration of the lock-in below,
-// rather than always being there sitting on the player.
-export const RECORD_DISC_NODE_NAME = 'Counter_Cube001'; // sanitized - raw name is "Counter_Cube.001" (GLTFLoader strips the dot, keeps the underscore)
+// The record disc itself used to be looked up here by name
+// (Counter_Cube.001, inside TRY7_SCENE.glb) - replaced by a standalone
+// RECORD_DISC.glb fed in via bindDisc() below, see world.js's
+// recordDiscRef and its writeup for why ("heres one with the unwarped
+// mesh and origins").
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const RECORD_PLAYER_CENTER = new THREE.Vector3(-5.72, 0.87, -11.46);
-const LOCK_CAMERA_OFFSET = new THREE.Vector3(0, 0.5, -1.0);
+const LOCK_CAMERA_OFFSET = new THREE.Vector3(0, 0.78, -0.34);
+// "did i ask for you to turn the camera? no. dont." - putting a nonzero x
+// on LOCK_CAMERA_OFFSET above rotates the view, since _lockQuat below
+// always aims at a fixed target: moving the CAMERA sideways while the
+// target stays put changes the angle between them, not just the position.
+// To shift the framing sideways with the exact same angle as before, both
+// the camera AND what it's aimed at need to move together by the same
+// amount - a dolly, not a pan. LOCK_LOOK_TARGET is that aim point,
+// separate from RECORD_PLAYER_CENTER (which stays the model's real
+// position, still used for the click-range check below) so this is a
+// pure "look slightly to the side of the actual object" framing choice,
+// not a change to what's considered "the record player" for interaction
+// purposes.
+const LOCK_LOOK_TARGET = new THREE.Vector3(-5.7, 0.87, -11.46);
 // Max distance (world units) from the player to the record player for a
 // click to register - keeps a lucky raycast from triggering this from
 // across the map/through walls, since this only checks the ray hit the
@@ -96,9 +102,9 @@ export class VinylInteraction {
     this.recordDisc = null; // resolved Counter_Cube.001 (the vinyl record) mesh, set by bindTarget()
     this.locked = false;
 
-    this._lockPos = RECORD_PLAYER_CENTER.clone().add(LOCK_CAMERA_OFFSET);
+    this._lockPos = LOCK_LOOK_TARGET.clone().add(LOCK_CAMERA_OFFSET);
     this._lockQuat = new THREE.Quaternion().setFromRotationMatrix(
-      new THREE.Matrix4().lookAt(this._lockPos, RECORD_PLAYER_CENTER, camera.up)
+      new THREE.Matrix4().lookAt(this._lockPos, LOCK_LOOK_TARGET, camera.up)
     );
 
     this._savedPos = new THREE.Vector3();
@@ -113,6 +119,10 @@ export class VinylInteraction {
     this._discRestY = 0; // set for real once bindTarget resolves the disc
     this._discDropping = false;
     this._discDropT = 0;
+    // "can we have the single vinyl on top of the player spin while music
+    // plays too" - toggled by main.js's audio play/pause listeners via
+    // setSpinning(), actually applied per-frame in update() below.
+    this._spinning = false;
     this._transFromPos = new THREE.Vector3();
     this._transFromQuat = new THREE.Quaternion();
     this._transToPos = new THREE.Vector3();
@@ -137,14 +147,31 @@ export class VinylInteraction {
       return;
     }
     this.target = mesh;
+  }
 
-    const disc = street.getObjectByName(RECORD_DISC_NODE_NAME);
-    if (disc && disc.isMesh) {
-      this.recordDisc = disc;
-      this._discRestY = disc.position.y; // its real, correct resting height - the drop animation lerps back to this, never past it
-      this.recordDisc.visible = false; // hidden until locked in - see the constant's writeup above
+  // Separate lazy-bind from bindTarget above - the disc now loads from its
+  // own standalone RECORD_DISC.glb (world.js's recordDiscRef), not looked
+  // up inside the big street scene, so it resolves on its own timeline.
+  // "heres one with the unwarped mesh and origins" - this new export's
+  // origin is already correctly centered at the source, so (unlike the
+  // old Counter_Cube.001 lookup this replaces) there's no runtime
+  // recentering needed here anymore.
+  bindDisc(mesh) {
+    if (this.recordDisc || !mesh?.isMesh) return;
+    this.recordDisc = mesh;
+    this._discRestY = mesh.position.y; // its real, correct resting height - the drop animation lerps back to this, never past it
+    // Same race the old Counter_Cube.001 lookup never had to worry about
+    // (that one was already sitting in the always-loaded street scene) -
+    // this standalone GLB can finish loading AFTER the player has already
+    // clicked in. _lockIn() only reveals+drops if this.recordDisc was set
+    // at that exact moment; if binding lands late, that call already ran
+    // and no-oped, so catch up here instead of leaving it invisible until
+    // the next lock/unlock cycle.
+    if (this.locked) {
+      this.recordDisc.visible = true;
+      this._startDiscDrop();
     } else {
-      console.warn(`[vinyl interaction] ${RECORD_DISC_NODE_NAME} not found in TRY7_SCENE - skipping the record reveal`);
+      this.recordDisc.visible = false; // hidden until locked in
     }
   }
 
@@ -155,14 +182,24 @@ export class VinylInteraction {
   // player's tiny on-screen footprint, which is unlikely enough not to be
   // worth the extra bookkeeping a real click-vs-drag threshold would need.
   _onClick(e) {
-    if (!this.target || this.locked || this._transitioning) return;
+    // Temporary - "once you exit you can't get back in, nothing happens at
+    // all" - every early-return path here is a silent no-op with no visible
+    // signal, so there's no way to tell WHICH guard is blocking re-entry
+    // without seeing it live. Logging every branch (not just failures) so
+    // the very first line printed tells us whether this handler is even
+    // firing at all. Remove once the real cause is found.
+    if (!this.target) { console.warn('[vinyl click] blocked: this.target not resolved'); return; }
+    if (this.locked) { console.warn('[vinyl click] blocked: still marked locked'); return; }
+    if (this._transitioning) { console.warn('[vinyl click] blocked: still marked transitioning'); return; }
     const rect = this.domElement.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObject(this.target, false);
-    if (hits.length === 0) return;
-    if (this.camera.position.distanceTo(RECORD_PLAYER_CENTER) > INTERACT_RANGE) return;
+    if (hits.length === 0) { console.warn('[vinyl click] blocked: raycast missed the record player mesh'); return; }
+    const dist = this.camera.position.distanceTo(RECORD_PLAYER_CENTER);
+    if (dist > INTERACT_RANGE) { console.warn(`[vinyl click] blocked: out of range (${dist.toFixed(2)} > ${INTERACT_RANGE})`); return; }
+    console.warn('[vinyl click] all checks passed, locking in');
     this._lockIn();
   }
 
@@ -221,6 +258,14 @@ export class VinylInteraction {
     this._startDiscDrop();
   }
 
+  // Public entry point for main.js's audio play/pause listeners - just
+  // sets a flag, actual per-frame rotation happens in update() below so
+  // it stays in sync with the same delta-time clock as everything else
+  // here instead of running its own rAF loop.
+  setSpinning(spinning) {
+    this._spinning = spinning;
+  }
+
   _unlock() {
     this._transFromPos.copy(this.camera.position);
     this._transFromQuat.copy(this.camera.quaternion);
@@ -247,6 +292,27 @@ export class VinylInteraction {
       const dt = easeOutCubic(Math.min(this._discDropT, 1));
       this.recordDisc.position.y = THREE.MathUtils.lerp(this._discRestY + DISC_DROP_HEIGHT, this._discRestY, dt);
       if (this._discDropT >= 1) this._discDropping = false;
+    }
+
+    // "can we have the single vinyl on top of the player spin while music
+    // plays too" - spins around the disc's own up axis at a real 33rpm
+    // turntable's rate (33.33 rev/min -> /60 for rev/sec -> *2π for
+    // radians/sec) while setSpinning(true) is in effect (main.js toggles
+    // this off the audio element's play/pause events). Runs independently
+    // of the drop/transition blocks above and below - happy to keep
+    // spinning through a track swap's drop animation or even the
+    // lock/unlock camera transition, same as a real record would.
+    if (this._spinning && this.recordDisc) {
+      // "wrong axis" - was `rotation.y +=`, which spins around the MESH's
+      // own local Y, whatever that happens to mean after its baked-in
+      // placement rotation (evidently not "flat like a turntable record"
+      // here - looked like it was tumbling/flipping instead). Switched to
+      // rotateOnWorldAxis with the actual world-up vector, which spins it
+      // flat around the vertical regardless of whatever the mesh's own
+      // local axes are oriented like - matches how a real record spins
+      // on a turntable no matter how the source file's local space is
+      // set up.
+      this.recordDisc.rotateOnWorldAxis(WORLD_UP, delta * ((33 + 1 / 3) / 60) * Math.PI * 2);
     }
 
     if (!this._transitioning) return;

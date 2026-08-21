@@ -106,28 +106,38 @@
        exit discoverable/clickable instead of being a keyboard-only secret. -->
   <button id="vinyl-exit-btn" class="hidden">&larr; back to walkaround</button>
 
+  <!-- Temporary camera-tuning readout for the vinyl lock view only - "you
+       failed again. add the coordinates for reference and ill give you a
+       coordinate" after several blind guesses at LOCK_CAMERA_OFFSET in
+       vinylInteraction.js went wrong. Shows the live camera position while
+       locked in so you can read off a number and hand it back directly
+       instead of me guessing again. Remove once the framing's settled. -->
+  <div id="vinyl-debug-pos" class="hidden"></div>
+
   <!-- Vinyl sample booth - shown once vinylInteraction.js's camera-lock
        finishes (main.js's onLocked callback). "i want to be able to play
        songs and swap out the cover. like a booth where u can sample" -
-       cover art + track info + prev/play/next controls, all driven by
-       VINYL_TRACKS in main.js. Built with 4 filler tracks (synthesized
-       placeholder tones, generated placeholder cover images) - "can you
-       set it up with fillers, ill provide clips and stuff" - same file
-       paths (public/audio/sample-N.*, public/covers/cover-N.jpg), so
-       dropping in real files later needs no code changes, just replace
-       the files (and update VINYL_TRACKS' title/artist text). -->
+       track info + prev/play/next controls, driven by VINYL_TRACKS in
+       main.js. Built with 4 filler tracks (synthesized placeholder tones,
+       generated placeholder cover images) - "can you set it up with
+       fillers, ill provide clips and stuff" - same file paths
+       (public/audio/sample-N.*, public/covers/cover-N.jpg), so dropping in
+       real files later needs no code changes, just replace the files (and
+       update VINYL_TRACKS' title/artist text). Cover art itself is no
+       longer a 2D card here - "these are going to serve as the cover" -
+       it's on the two mesh planes at the record player instead, see
+       world.js's albumCoverPlanes. -->
   <div id="vinyl-booth" class="hidden">
-    <div id="vinyl-booth-cover-wrap">
-      <img id="vinyl-booth-cover" src="" alt="" />
-    </div>
-    <div id="vinyl-booth-info">
-      <div id="vinyl-booth-title"></div>
-      <div id="vinyl-booth-artist"></div>
-    </div>
-    <div id="vinyl-booth-controls">
-      <button id="vinyl-booth-prev" aria-label="Previous track">&lt;</button>
-      <button id="vinyl-booth-play" aria-label="Play or pause">&#10074;&#10074;</button>
-      <button id="vinyl-booth-next" aria-label="Next track">&gt;</button>
+    <div id="vinyl-booth-panel">
+      <div id="vinyl-booth-info">
+        <div id="vinyl-booth-title"></div>
+        <div id="vinyl-booth-artist"></div>
+      </div>
+      <div id="vinyl-booth-controls">
+        <button id="vinyl-booth-prev" aria-label="Previous track">&lt;</button>
+        <button id="vinyl-booth-play" aria-label="Play or pause">&#10074;&#10074;</button>
+        <button id="vinyl-booth-next" aria-label="Next track">&gt;</button>
+      </div>
     </div>
   </div>
   <audio id="vinyl-booth-audio" preload="none"></audio>

@@ -295,6 +295,8 @@ export function buildWorld(scene, renderer) {
   addBike(scene);
   addTiles(scene);
   addSigns(scene);
+  addAlbumCovers(scene);
+  addRecordDisc(scene);
   // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
   // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
   // directly into the main scene (node tripo_node_...001, loaded as part of
@@ -912,6 +914,22 @@ async function addStreetScene(scene) {
       console.warn('[missing sign] Object258 not found in TRY7_SCENE - skipping hide');
     }
 
+    // Old vinyl record disc (Counter_Cube.001) - superseded by the
+    // standalone RECORD_DISC.glb (see recordDiscRef/addRecordDisc below),
+    // which has a correctly-centered origin baked in from the source file
+    // instead of the runtime bounding-box recenter hack this one needed.
+    // Nothing hides this automatically anymore since vinylInteraction's
+    // bindTarget() was stripped down to stop touching it at all - it was
+    // defaulting to visible and showing up as a second, misshapen,
+    // non-spinning disc stacked on top of the real one. Permanently hidden
+    // here, same as Object258 above.
+    const oldDiscNode = street.getObjectByName(sanitizeGltfName('Counter_Cube.001'));
+    if (oldDiscNode) {
+      oldDiscNode.visible = false;
+    } else {
+      console.warn('[old disc] Counter_Cube.001 not found in TRY7_SCENE - skipping hide');
+    }
+
     // Windows swap (see addBlackGlassWindows below for the full writeup)
     // runs HERE, before scene.add - it's plain in-code material assignment
     // with no GLB fetch behind it, so there's no reason to let it join the
@@ -1219,6 +1237,89 @@ async function addLoki(scene) {
 // baseColorTexture (1024px JPEG, 330KB) left untouched - already small,
 // and per the HD-tier sign rule elsewhere in this file (search
 // MENU_SIGN_NODE_NAMES) sign text stays unshrunk for legibility anyway.
+// "these are going to serve as the cover" - two flat quads (album covers next
+// and current.glb, exported with square-ish UVs so cover art maps on with
+// minimal stretch) that replace the old floating 2D UI cover card with a
+// real mesh sitting right at the record player. No baked material in the
+// export (plain geometry only) - loadVinylTrack in main.js builds a fresh
+// MeshBasicMaterial per plane and swaps its .map on every track change,
+// same unlit/flat convention as everything else here. Exported so main.js
+// can reach these two meshes directly without a getObjectByName lookup
+// through the (unrelated) street scene - starts null, populated once the
+// tiny (2KB) file resolves, which given its size is effectively immediate.
+export const albumCoverPlanes = { current: null, next: null };
+const ALBUM_COVERS_LOADING_TOKEN = 'album-covers-model-load';
+
+async function addAlbumCovers(scene) {
+  loadingManager.itemStart(ALBUM_COVERS_LOADING_TOKEN);
+  try {
+    const { scene: covers } = await loadModel('/models/ALBUM_COVERS.glb');
+    // "in case i misspoke too, plane .005 is current and plane .004 is the
+    // 'up next' cover" - corrected from an earlier (wrong) guess.
+    const current = covers.getObjectByName(sanitizeGltfName('Plane.005'));
+    const next = covers.getObjectByName(sanitizeGltfName('Plane.004'));
+    if (current?.isMesh) {
+      // MeshBasicMaterial multiplies its .color against .map - this
+      // started as 0x111111 (a near-black placeholder before any texture
+      // loads) but that tint never got reset once main.js's
+      // applyCoverPlaneTextures() sets the real cover .map, so every cover
+      // was rendering at ~7% brightness ("really dark" - already unlit,
+      // MeshBasicMaterial ignores scene lights entirely, this was a tint
+      // bug not a lighting one). White leaves the map's own colors
+      // untouched.
+      current.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      albumCoverPlanes.current = current;
+    } else {
+      console.warn('[album covers] Plane.005 (current) not found in ALBUM_COVERS.glb - skipping');
+    }
+    if (next?.isMesh) {
+      next.material = new THREE.MeshBasicMaterial({ color: 0xffffff }); // see "current" plane comment above - same tint fix
+      albumCoverPlanes.next = next;
+    } else {
+      console.warn('[album covers] Plane.004 (next) not found in ALBUM_COVERS.glb - skipping');
+    }
+    scene.add(covers);
+  } catch (err) {
+    console.error('[album covers] failed to load ALBUM_COVERS.glb:', err);
+  } finally {
+    loadingManager.itemEnd(ALBUM_COVERS_LOADING_TOKEN);
+  }
+}
+
+// "heres one with the unwarped mesh and origins" - replaces the record
+// disc that used to live inside TRY7_SCENE.glb as Counter_Cube.001
+// (looked up via getObjectByName, then runtime-recentered in
+// vinylInteraction.js to work around its off-center origin). This is a
+// standalone single-node export with a correctly-centered origin already
+// baked in at the source, positioned directly at the record player via
+// its own node transform - no recentering hack needed anymore.
+// vinylInteraction.js reads this via bindDisc() instead of a
+// getObjectByName lookup, same lazy-bind-once-loaded pattern as
+// albumCoverPlanes above. Starts hidden (only shown while locked into the
+// record player, see vinylInteraction.js's _lockIn/_unlock) - matches the
+// old Counter_Cube.001's default-hidden behavior.
+export const recordDiscRef = { mesh: null };
+const RECORD_DISC_LOADING_TOKEN = 'record-disc-model-load';
+
+async function addRecordDisc(scene) {
+  loadingManager.itemStart(RECORD_DISC_LOADING_TOKEN);
+  try {
+    const { scene: discScene } = await loadModel('/models/RECORD_DISC.glb');
+    const disc = discScene.getObjectByName(sanitizeGltfName('Stickersbox02_Cube.005'));
+    if (disc?.isMesh) {
+      disc.visible = false;
+      recordDiscRef.mesh = disc;
+    } else {
+      console.warn('[record disc] Stickersbox02_Cube.005 not found in RECORD_DISC.glb - skipping');
+    }
+    scene.add(discScene);
+  } catch (err) {
+    console.error('[record disc] failed to load RECORD_DISC.glb:', err);
+  } finally {
+    loadingManager.itemEnd(RECORD_DISC_LOADING_TOKEN);
+  }
+}
+
 const SIGNS_LOADING_TOKEN = 'signs-model-load';
 
 async function addSigns(scene) {

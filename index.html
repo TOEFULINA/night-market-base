@@ -106,6 +106,32 @@
        exit discoverable/clickable instead of being a keyboard-only secret. -->
   <button id="vinyl-exit-btn" class="hidden">&larr; back to walkaround</button>
 
+  <!-- Vinyl sample booth - shown once vinylInteraction.js's camera-lock
+       finishes (main.js's onLocked callback). "i want to be able to play
+       songs and swap out the cover. like a booth where u can sample" -
+       cover art + track info + prev/play/next controls, all driven by
+       VINYL_TRACKS in main.js. Built with 4 filler tracks (synthesized
+       placeholder tones, generated placeholder cover images) - "can you
+       set it up with fillers, ill provide clips and stuff" - same file
+       paths (public/audio/sample-N.*, public/covers/cover-N.jpg), so
+       dropping in real files later needs no code changes, just replace
+       the files (and update VINYL_TRACKS' title/artist text). -->
+  <div id="vinyl-booth" class="hidden">
+    <div id="vinyl-booth-cover-wrap">
+      <img id="vinyl-booth-cover" src="" alt="" />
+    </div>
+    <div id="vinyl-booth-info">
+      <div id="vinyl-booth-title"></div>
+      <div id="vinyl-booth-artist"></div>
+    </div>
+    <div id="vinyl-booth-controls">
+      <button id="vinyl-booth-prev" aria-label="Previous track">&lt;</button>
+      <button id="vinyl-booth-play" aria-label="Play or pause">&#10074;&#10074;</button>
+      <button id="vinyl-booth-next" aria-label="Next track">&gt;</button>
+    </div>
+  </div>
+  <audio id="vinyl-booth-audio" preload="none"></audio>
+
   <!-- Explore location prev/next arrows - only shown right after flying
        into one of the Explore submenu's fixed spots (main.js's
        exploreNav* logic toggles .hidden). Cycle to the adjacent Explore

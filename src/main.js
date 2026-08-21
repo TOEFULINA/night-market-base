@@ -106,6 +106,71 @@ let hasEnteredWalkModeBefore = false;
 const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 
+// Vinyl sample booth - "i want to be able to play songs and swap out the
+// cover. like a booth where u can sample." Filler content for now ("can
+// you set it up with fillers, ill provide clips and stuff") - synthesized
+// placeholder tones + generated placeholder cover images, same file
+// naming scheme real ones would use, so swapping in real content later is
+// just replacing these files and updating title/artist text, no code
+// changes needed.
+const VINYL_TRACKS = [
+  { title: 'Track One', artist: 'Filler Artist', cover: '/covers/cover-1.jpg', audio: '/audio/sample-1.wav' },
+  { title: 'Track Two', artist: 'Filler Artist', cover: '/covers/cover-2.jpg', audio: '/audio/sample-2.wav' },
+  { title: 'Track Three', artist: 'Filler Artist', cover: '/covers/cover-3.jpg', audio: '/audio/sample-3.wav' },
+  { title: 'Track Four', artist: 'Filler Artist', cover: '/covers/cover-4.jpg', audio: '/audio/sample-4.wav' },
+];
+
+const vinylBoothEl = document.getElementById('vinyl-booth');
+const vinylBoothCoverWrapEl = document.getElementById('vinyl-booth-cover-wrap');
+const vinylBoothCoverEl = document.getElementById('vinyl-booth-cover');
+const vinylBoothTitleEl = document.getElementById('vinyl-booth-title');
+const vinylBoothArtistEl = document.getElementById('vinyl-booth-artist');
+const vinylBoothPlayBtn = document.getElementById('vinyl-booth-play');
+const vinylBoothAudioEl = document.getElementById('vinyl-booth-audio');
+let vinylTrackIndex = 0;
+
+// Loads a track into the booth UI (cover/title/artist/audio src) and
+// optionally starts it playing. `replayDrop` is false for the very first
+// track (the record already dropped as part of approaching/locking in,
+// see vinylInteraction.js's _lockIn) and true for every subsequent swap
+// (a "new record" going on, so it drops again).
+function loadVinylTrack(index, { replayDrop = true, autoplay = true } = {}) {
+  vinylTrackIndex = ((index % VINYL_TRACKS.length) + VINYL_TRACKS.length) % VINYL_TRACKS.length;
+  const track = VINYL_TRACKS[vinylTrackIndex];
+
+  vinylBoothCoverEl.src = track.cover;
+  vinylBoothTitleEl.textContent = track.title;
+  vinylBoothArtistEl.textContent = track.artist;
+
+  // Restart the cover-in animation - remove the class, force a reflow
+  // (reading offsetWidth), then add it back, since just re-adding an
+  // already-present class doesn't re-trigger a CSS animation on its own.
+  vinylBoothCoverWrapEl.classList.remove('vinyl-booth-cover-animate');
+  void vinylBoothCoverWrapEl.offsetWidth;
+  vinylBoothCoverWrapEl.classList.add('vinyl-booth-cover-animate');
+
+  if (replayDrop) vinylInteraction?.replayDrop();
+
+  vinylBoothAudioEl.src = track.audio;
+  if (autoplay) {
+    vinylBoothAudioEl.play().catch(() => {}); // autoplay can be blocked in some contexts - not worth surfacing an error over, the play button still works
+  }
+  updateVinylPlayButton();
+}
+
+function updateVinylPlayButton() {
+  vinylBoothPlayBtn.innerHTML = vinylBoothAudioEl.paused ? '&#9654;' : '&#10074;&#10074;';
+}
+
+document.getElementById('vinyl-booth-prev')?.addEventListener('click', () => loadVinylTrack(vinylTrackIndex - 1));
+document.getElementById('vinyl-booth-next')?.addEventListener('click', () => loadVinylTrack(vinylTrackIndex + 1));
+vinylBoothPlayBtn?.addEventListener('click', () => {
+  if (vinylBoothAudioEl.paused) vinylBoothAudioEl.play().catch(() => {});
+  else vinylBoothAudioEl.pause();
+});
+vinylBoothAudioEl?.addEventListener('play', updateVinylPlayButton);
+vinylBoothAudioEl?.addEventListener('pause', updateVinylPlayButton);
+
 const welcomeBubbleEl = document.getElementById('welcome-bubble');
 const WELCOME_BUBBLE_AUTO_DISMISS_MS = 8000;
 let welcomeBubbleDismissTimer = null;
@@ -428,20 +493,23 @@ function startTransition(routeKey) {
   };
 
   // Record player click-to-lock (vinylInteraction.js) - see that file for
-  // the full writeup. onLocked is the hook for the vinyl animation you're
-  // going to provide separately; still logging for now so there's something
-  // to see in devtools until that exists, plus now also showing the "back
-  // to walkaround" button (top right, see index.html/style.css) per your
+  // the full writeup. onLocked now opens the sample booth (VINYL_TRACKS
+  // above) instead of just logging - loads track 0 WITHOUT replaying the
+  // drop (it already dropped once as part of the approach/lock-in itself,
+  // see vinylInteraction.js's _lockIn). Also still showing the "back to
+  // walkaround" button (top right, see index.html/style.css) per your
   // ask - Escape already exited this view, but nothing on screen told you
   // that was possible, so this makes the same exit visible/clickable.
   vinylInteraction = new VinylInteraction(camera, renderer.domElement, controls, {
     onLocked: () => {
-      console.log('[vinyl interaction] locked in - vinyl animation hook goes here');
       vinylExitBtn?.classList.remove('hidden');
+      vinylBoothEl?.classList.remove('hidden');
+      loadVinylTrack(0, { replayDrop: false });
     },
     onUnlocked: () => {
-      console.log('[vinyl interaction] unlocked, back to normal walk control');
       vinylExitBtn?.classList.add('hidden');
+      vinylBoothEl?.classList.add('hidden');
+      vinylBoothAudioEl.pause();
     },
   });
 }

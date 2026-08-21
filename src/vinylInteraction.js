@@ -187,9 +187,7 @@ export class VinylInteraction {
     // over the drop below, instead of just popping in at rest.
     if (this.recordDisc) {
       this.recordDisc.visible = true;
-      this.recordDisc.position.y = this._discRestY + DISC_DROP_HEIGHT;
-      this._discDropping = true;
-      this._discDropT = 0;
+      this._startDiscDrop();
     }
     this._savedYaw = this.controls.yaw;
     this._savedPitch = this.controls.pitch;
@@ -203,6 +201,24 @@ export class VinylInteraction {
     this._transitioning = true;
     this._transitionReverse = false;
     this._transitionT = 0;
+  }
+
+  // Shared by _lockIn() (the initial approach) and replayDrop() below (a
+  // swap to a new track in the sample booth) - same lifted-then-eased-down
+  // motion either way, just triggered at two different moments.
+  _startDiscDrop() {
+    this.recordDisc.position.y = this._discRestY + DISC_DROP_HEIGHT;
+    this._discDropping = true;
+    this._discDropT = 0;
+  }
+
+  // Public entry point for the vinyl booth (main.js) - "the vinyl drops
+  // down" each time you swap to a new album, same physical motion as the
+  // very first approach, not just on the initial lock-in. No-ops while not
+  // locked in (nothing to animate) or the disc failed to resolve.
+  replayDrop() {
+    if (!this.locked || !this.recordDisc) return;
+    this._startDiscDrop();
   }
 
   _unlock() {

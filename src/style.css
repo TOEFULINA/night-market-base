@@ -465,6 +465,91 @@ body.about-open #main-menu-list {
 #vinyl-exit-btn:hover { opacity: 1; }
 #vinyl-exit-btn.hidden { display: none; }
 
+/* Vinyl sample booth - bottom-center while locked into the record player
+   (see #vinyl-exit-btn above for the exit button this sits alongside).
+   Dark translucent card, same flat white-on-dark chrome language as the
+   rest of the corner UI, just centered/bottom instead of a corner since
+   this is the main interactive focus of this view rather than
+   incidental nav. */
+#vinyl-booth {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 13;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 28px;
+  background: rgba(5, 6, 10, 0.7);
+  border-radius: 6px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: #fff;
+}
+#vinyl-booth.hidden { display: none; }
+
+#vinyl-booth-cover-wrap {
+  width: 120px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #111;
+}
+#vinyl-booth-cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* "like the image of the cover animate in" - JS restarts this animation
+   on every track swap (remove the class, force reflow, add it back) by
+   toggling .vinyl-booth-cover-animate on the wrap, not on the <img>
+   itself, so a fast double-click re-triggers cleanly instead of the
+   browser no-op-ing an already-running animation on the same element. */
+#vinyl-booth-cover-wrap.vinyl-booth-cover-animate #vinyl-booth-cover {
+  animation: vinylCoverIn 0.45s ease;
+}
+@keyframes vinylCoverIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+#vinyl-booth-info { text-align: center; }
+#vinyl-booth-title {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+#vinyl-booth-artist {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+#vinyl-booth-controls {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+#vinyl-booth-controls button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+  padding: 6px;
+}
+#vinyl-booth-controls button:hover { opacity: 1; }
+#vinyl-booth-prev,
+#vinyl-booth-next {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+}
+#vinyl-booth-play { font-size: 13px; }
+
 /* Portfolio gallery overlay - flat 2D side of the Portfolio submenu, opens
    on top of title screen or walk mode alike (main.js's openPortfolioGallery/
    closePortfolioGallery). White background per your call ("the portfolio

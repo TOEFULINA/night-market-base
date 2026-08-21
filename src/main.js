@@ -166,6 +166,22 @@ const TITLE_HOME_QUAT = titleScreen.camera.quaternion.clone();
 // (it's private to controls.js) - y is just the literal value from the
 // readout, which is always EYE_HEIGHT since that's what the debug overlay
 // reads camera.position.y as while standing still.
+// Portfolio gallery - the flat 2D side of the Portfolio submenu, separate
+// from the 3D Explore side (LOCATIONS below) entirely. Maps each
+// data-route to the public/portfolio/<slug>/ folder + manifest.json key
+// built by the optimize/transcode pass (see that folder's history - 177
+// images resized/re-encoded, 894MB of raw phone/screen-recording video
+// compressed down to 21MB across 14 clips). Title kept here rather than
+// derived from the route string since "3d-modeling" -> "3D Modeling" etc.
+// isn't a clean mechanical transform.
+const PORTFOLIO_CATEGORIES = {
+  'portfolio-illustration': { slug: 'illustration', title: 'Illustration' },
+  'portfolio-graphic-design': { slug: 'graphic-design', title: 'Graphic Design' },
+  'portfolio-3d-modeling': { slug: '3d', title: '3D Modeling' },
+  'portfolio-merchandise-design': { slug: 'merchandise', title: 'Merchandise Design' },
+  'portfolio-dynamics': { slug: 'dynamics', title: 'Dynamics' },
+};
+
 const LOCATIONS = {
   'explore-archive-shop': { x: -2.74, y: 1.3, z: -18.01, yawDeg: 180 },
   'explore-records': { x: -5.61, y: 1.3, z: -15.25, yawDeg: 141 },
@@ -752,6 +768,107 @@ document.querySelectorAll('.menu-label[data-toggle]').forEach((label) => {
   });
 });
 
+// Portfolio gallery - fetch-once-cache-forever manifest (built at build
+// time by the optimize script, not something that changes at runtime), a
+// grid of tiles, and a lightbox for the full-size view. Lives on top of
+// whichever mode (title/walk) was already showing - doesn't touch camera,
+// scene.fog, or any of the 3D transition machinery above at all.
+const portfolioGalleryEl = document.getElementById('portfolio-gallery');
+const portfolioGalleryTitleEl = document.getElementById('portfolio-gallery-title');
+const portfolioGalleryGridEl = document.getElementById('portfolio-gallery-grid');
+const portfolioGalleryCloseBtn = document.getElementById('portfolio-gallery-close');
+const portfolioLightboxEl = document.getElementById('portfolio-lightbox');
+const portfolioLightboxContentEl = document.getElementById('portfolio-lightbox-content');
+const portfolioLightboxCloseBtn = document.getElementById('portfolio-lightbox-close');
+
+let portfolioManifestPromise = null;
+function getPortfolioManifest() {
+  if (!portfolioManifestPromise) {
+    portfolioManifestPromise = fetch('/portfolio/manifest.json').then((r) => r.json());
+  }
+  return portfolioManifestPromise;
+}
+
+function isVideoPath(path) {
+  return /\.(mp4|mov|webm)$/i.test(path);
+}
+
+function openPortfolioLightbox(path) {
+  portfolioLightboxContentEl.innerHTML = '';
+  if (isVideoPath(path)) {
+    const video = document.createElement('video');
+    video.src = path;
+    video.controls = true;
+    video.autoplay = true;
+    video.loop = true;
+    video.playsInline = true;
+    portfolioLightboxContentEl.appendChild(video);
+  } else {
+    const img = document.createElement('img');
+    img.src = path;
+    portfolioLightboxContentEl.appendChild(img);
+  }
+  portfolioLightboxEl.classList.remove('hidden');
+}
+
+function closePortfolioLightbox() {
+  portfolioLightboxEl.classList.add('hidden');
+  // Stop playback rather than leaving a hidden video running - pause
+  // before clearing so there's no stray audio for a frame.
+  portfolioLightboxContentEl.querySelector('video')?.pause();
+  portfolioLightboxContentEl.innerHTML = '';
+}
+
+async function openPortfolioGallery(route) {
+  const category = PORTFOLIO_CATEGORIES[route];
+  if (!category) return;
+
+  portfolioGalleryTitleEl.textContent = category.title;
+  portfolioGalleryGridEl.innerHTML = '';
+  portfolioGalleryEl.classList.remove('hidden');
+
+  const manifest = await getPortfolioManifest();
+  const items = manifest[category.slug] || [];
+
+  for (const path of items) {
+    const tile = document.createElement('div');
+    tile.className = 'portfolio-tile';
+    if (isVideoPath(path)) {
+      tile.classList.add('is-video');
+      const video = document.createElement('video');
+      video.src = path;
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      tile.appendChild(video);
+    } else {
+      const img = document.createElement('img');
+      img.src = path;
+      img.loading = 'lazy';
+      tile.appendChild(img);
+    }
+    tile.addEventListener('click', () => openPortfolioLightbox(path));
+    portfolioGalleryGridEl.appendChild(tile);
+  }
+}
+
+function closePortfolioGallery() {
+  portfolioGalleryEl.classList.add('hidden');
+  closePortfolioLightbox();
+}
+
+portfolioGalleryCloseBtn?.addEventListener('click', closePortfolioGallery);
+portfolioLightboxCloseBtn?.addEventListener('click', closePortfolioLightbox);
+// Click the dimmed backdrop (not the media itself) to dismiss the lightbox.
+portfolioLightboxEl?.addEventListener('click', (e) => {
+  if (e.target === portfolioLightboxEl) closePortfolioLightbox();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!portfolioLightboxEl.classList.contains('hidden')) closePortfolioLightbox();
+  else if (!portfolioGalleryEl.classList.contains('hidden')) closePortfolioGallery();
+});
+
 document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
   li.addEventListener('click', () => {
     const route = li.dataset.route;
@@ -764,6 +881,16 @@ document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
     // input listeners behind.
     if (route === 'home') {
       startReturnToTitle();
+      return;
+    }
+
+    // Portfolio submenu items open the flat gallery overlay instead of
+    // flying anywhere in the 3D scene - checked before the LOCATIONS
+    // fallthrough below since these routes intentionally have no
+    // LOCATIONS entry (they were never meant to be 3D spots).
+    if (PORTFOLIO_CATEGORIES[route]) {
+      openPortfolioGallery(route);
+      collapseMainMenu();
       return;
     }
 

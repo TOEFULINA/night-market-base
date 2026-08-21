@@ -294,6 +294,7 @@ export function buildWorld(scene, renderer) {
   addMe(scene);
   addBike(scene);
   addTiles(scene);
+  addSigns(scene);
   // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
   // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
   // directly into the main scene (node tripo_node_...001, loaded as part of
@@ -894,6 +895,23 @@ async function addStreetScene(scene) {
       }
     }
 
+    // "we have a missing sign mesh" - the blank panel next to the 3D
+    // PRINTING sign turned out to be Object258 (confirmed by exact mesh
+    // AND material name match - "Material_#12_1" - against a diagnostic
+    // scan run against this exact file, not a guess). You sent a re-baked
+    // standalone signs.glb with the real texture (Octarian Hangyodon +
+    // AirPack, packed into the same combined atlas as the already-working
+    // Love Potion/Shoes signs) - see addSigns() below. Permanently hidden
+    // here (not layers.set(1) like TITLE_HIDDEN_NODE_NAMES above - this
+    // one's just wrong in every mode, not mode-specific) so the new SIGNS
+    // mesh doesn't render behind/through the old blank one.
+    const oldSignNode = street.getObjectByName(sanitizeGltfName('Object258'));
+    if (oldSignNode) {
+      oldSignNode.visible = false;
+    } else {
+      console.warn('[missing sign] Object258 not found in TRY7_SCENE - skipping hide');
+    }
+
     // Windows swap (see addBlackGlassWindows below for the full writeup)
     // runs HERE, before scene.add - it's plain in-code material assignment
     // with no GLB fetch behind it, so there's no reason to let it join the
@@ -1181,6 +1199,45 @@ async function addLoki(scene) {
     console.error('[loki] failed to load LOKI.glb:', err);
   } finally {
     loadingManager.itemEnd(LOKI_LOADING_TOKEN);
+  }
+}
+
+// SIGNS.glb - "we have a missing sign mesh" -> "its the one that says
+// octarian hangyodon on it" -> "actuyally the airpack and that one".
+// Single node (Object258, same name+material as the blank one hidden in
+// addStreetScene above), one combined texture atlas covering the whole
+// sign cluster on this building face: Octarian Hangyodon + AirPack (the
+// two that were actually missing) plus Love Potion/Shoes+Accessories
+// (already working elsewhere, now consolidated into this one re-baked
+// mesh instead of staying split across the old geometry). Material had
+// an emissiveTexture (2048px PNG, 3.35MB) in the original export, but
+// toUnlitFlat() never actually samples emissiveMap for color - it's only
+// checked as a boolean to decide whether a material flickers (see
+// shading.js) - so that texture was dropped entirely and emissiveFactor
+// [0.5,0.5,0.5] kept on its own to still trigger the flicker, same
+// "don't ship dead bytes" rule as every other texture pass in this file.
+// baseColorTexture (1024px JPEG, 330KB) left untouched - already small,
+// and per the HD-tier sign rule elsewhere in this file (search
+// MENU_SIGN_NODE_NAMES) sign text stays unshrunk for legibility anyway.
+const SIGNS_LOADING_TOKEN = 'signs-model-load';
+
+async function addSigns(scene) {
+  loadingManager.itemStart(SIGNS_LOADING_TOKEN);
+  try {
+    const { scene: signs } = await loadModel('/models/SIGNS.glb');
+    signs.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.receiveShadow = true;
+    });
+    scene.add(signs);
+  } catch (err) {
+    console.error('[signs] failed to load SIGNS.glb:', err);
+  } finally {
+    loadingManager.itemEnd(SIGNS_LOADING_TOKEN);
   }
 }
 

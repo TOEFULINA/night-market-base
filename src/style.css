@@ -226,6 +226,16 @@ body.about-open #main-menu {
 body.portfolio-open #main-menu-list,
 body.about-open #main-menu-list {
   flex-direction: row;
+  /* Without this, the row's default stretch cross-axis sizing makes
+     every top-level <li> match the height of whichever one has its
+     submenu open (Portfolio), and since plain items are
+     align-items:center inline-flex boxes (see the shared li/.menu-label
+     rule below), CONTACT/ABOUT would visibly drift down to sit centered
+     in that taller box - "the contact and about label still follow the
+     dynamics of the drop down." Pinning the row to flex-start keeps
+     every item's own top edge fixed regardless of what any sibling's
+     submenu is doing. */
+  align-items: flex-start;
   gap: 32px;
 }
 

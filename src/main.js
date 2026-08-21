@@ -907,9 +907,14 @@ const aboutBackToTopBtn = document.getElementById('about-back-to-top');
 
 function showAboutOverlay() {
   aboutOverlayEl?.classList.remove('hidden');
+  // Horizontal corner menu on this page too - see body.about-open in
+  // style.css ("portfolio would be right of the logo... ONLY on
+  // portfolio and about me tho").
+  document.body.classList.add('about-open');
 }
 function hideAboutOverlay() {
   aboutOverlayEl?.classList.add('hidden');
+  document.body.classList.remove('about-open');
 }
 aboutOverlayCloseBtn?.addEventListener('click', hideAboutOverlay);
 // "Back 2 Top" from the original page - this overlay is one scrolling

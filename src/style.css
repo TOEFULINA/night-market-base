@@ -183,13 +183,14 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
 }
 #main-menu.hidden { display: none; }
 
-/* "keep the menu option in top left but open it to the right instead of
-   down while on portfolio pages" - the gallery (#portfolio-gallery,
+/* "keep the menu option in top left" - the gallery (#portfolio-gallery,
    z-index 16) sits ABOVE #main-menu (z-index 12) and is a solid opaque
    white page, so without this the corner nav is simply hidden behind it
-   the whole time you're browsing. Bumped above the gallery AND its close
-   button (17), and flipped from white to dark text/logo since it's now
-   reading against a white background instead of the dark 3D scene. */
+   the whole time you're browsing. Bumped above the gallery (18), and
+   flipped from white to dark text/logo since it's now reading against a
+   white background instead of the dark 3D scene. About Me doesn't need
+   this part - the overlay's translucent, main-menu already shows through
+   fine in its normal white-on-dark colors there. */
 body.portfolio-open #main-menu {
   z-index: 18;
 }
@@ -203,6 +204,29 @@ body.portfolio-open .menu-arrow {
 }
 body.portfolio-open .submenu li {
   color: #111;
+}
+
+/* Horizontal menu, portfolio AND about-me pages - "when i mean menu open
+   to the right, i mean all of it. portfolio would be right of the logo,
+   and drop down below that. explore would be right of portfolio, with a
+   drop down below." So: the LOGO stays put top-left, but the LIST turns
+   into a row running to the right of it instead of stacking underneath -
+   #main-menu itself goes row (logo | list side by side) and
+   #main-menu-list goes row too (Portfolio / Explore / Contact / About
+   side by side). Each item's own submenu is unaffected by this and still
+   opens straight down below that item - that part of has-submenu's
+   layout (flex-direction:column on the <li> itself, submenu after the
+   label in normal flow) doesn't care which direction the OUTER list runs. */
+body.portfolio-open #main-menu,
+body.about-open #main-menu {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 32px;
+}
+body.portfolio-open #main-menu-list,
+body.about-open #main-menu-list {
+  flex-direction: row;
+  gap: 32px;
 }
 
 #main-menu-logo {
@@ -323,26 +347,6 @@ body.portfolio-open .submenu li {
   margin-top: 8px;
 }
 
-/* Sideways submenu - portfolio gallery pages only ("open it to the right
-   instead of down while on portfolio pages"). Tried the same treatment on
-   the About Me overlay too ("open the menu horizontally on the about me
-   page") but that page is narrower/more text-heavy and the sideways
-   submenu ended up overlapping the profile pic/header instead of the
-   downward one it was replacing - "not on about me" reverted that half,
-   this stays portfolio-only. #main-menu-list li.has-submenu needs
-   position:relative for the absolute-positioned .submenu below to anchor
-   off IT rather than the whole page. */
-body.portfolio-open #main-menu-list li.has-submenu {
-  position: relative;
-}
-body.portfolio-open .has-submenu:hover .submenu {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  margin-top: 0;
-  margin-left: 14px;
-  max-height: none; /* no longer collapsing vertically, so the height cap doesn't apply */
-}
 .submenu li {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-weight: 700;

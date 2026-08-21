@@ -1177,6 +1177,17 @@ async function addBike(scene) {
 // workaround) - this node's own scale (~0.0248, close to Loki's own
 // ~0.0254 tile/bike scale) is trusted as-is, same as everything else in
 // this shared re-export batch.
+//
+// Re-exported a second time right after ("had some unpacked textures
+// heres the corrdect [correct one]... in the model of just me i mean") -
+// justmeproper.glb, same single Tube.001 node/9-primitive structure and
+// same material names, so this just replaced ME.glb's baked textures and
+// added a real rotation quaternion (the first export had none, i.e.
+// identity - this one has an actual facing direction baked in). Rebuilt
+// through the same split-and-strip pipeline as the first ME.glb: Draco
+// bufferViews copied through unchanged, materials stripped to
+// baseColorTexture only, images optimized (18MB -> 1.2MB across all 9
+// bakes combined this pass).
 const ME_LOADING_TOKEN = 'me-model-load';
 
 async function addMe(scene) {

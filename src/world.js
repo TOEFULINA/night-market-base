@@ -275,6 +275,7 @@ export function buildWorld(scene, renderer) {
   const atmosphere = createAtmosphere(scene);
 
   addStreetScene(scene);
+  addLoki(scene);
   // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
   // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
   // directly into the main scene (node tripo_node_...001, loaded as part of
@@ -949,6 +950,53 @@ async function addStreetScene(scene) {
 // at MOST but please dont much": ~863KB -> ~650KB, pixel-identical, no
 // quality lost. Texture has real (non-cutout) alpha - carried through as
 // alphaMode BLEND, not forced opaque.
+// lokibaked.glb / lokibaked-1aea9f4a.glb - "a 16k mesh with one single
+// baked UV" you asked about, then uploaded. Single mesh (15,399 verts,
+// 21,546 tris), single material, single 4096x4096 baked PNG. Geometry is
+// Draco-compressed already (~72KB), so the only real weight was the
+// texture: downscaled 4096 -> 2048 and re-encoded losslessly (PIL,
+// optimize=True), same "shrink the bake, don't touch the mesh" move used
+// on the record store 3k->2k pass - 4.71MB source glb -> 1.92MB LOKI.glb.
+//
+// Position/rotation/scale are NOT set here - per "this was one asset in
+// the scene directly exported," the node's transform in the file itself
+// (translation ~(-17.47, 0, -16.69), a quaternion rotation, ~0.0093 scale)
+// already IS the correct world placement from Blender, so this just adds
+// the loaded scene as-is, same trust-the-export pattern as
+// addBackgroundBuilding right below.
+//
+// One thing worth flagging, not silently deciding: the bake's alpha
+// channel has real partial-transparency data (~7% of pixels sit around
+// alpha 102, reads like soft cutout edges - hair/fur strands, most
+// likely), but the exported glTF material never sets alphaMode to BLEND
+// or MASK, so per spec (and this whole file's established "alphaMode
+// defaults to OPAQUE" rule) it renders fully opaque here, same as
+// GLTFLoader would render it anywhere else. If those edges are meant to
+// read as soft/transparent instead of solid, that's a re-export with
+// alphaMode set on the material, not something to guess at from here.
+const LOKI_LOADING_TOKEN = 'loki-model-load';
+
+async function addLoki(scene) {
+  loadingManager.itemStart(LOKI_LOADING_TOKEN);
+  try {
+    const { scene: loki } = await loadModel('/models/LOKI.glb');
+    loki.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+    scene.add(loki);
+  } catch (err) {
+    console.error('[loki] failed to load LOKI.glb:', err);
+  } finally {
+    loadingManager.itemEnd(LOKI_LOADING_TOKEN);
+  }
+}
+
 async function addBackgroundBuilding(scene) {
   try {
     const { scene: bg } = await loadModel('/models/BG_BUILDING.glb');

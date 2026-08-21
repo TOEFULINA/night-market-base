@@ -680,6 +680,23 @@ async function addStreetScene(scene) {
     // and correctly patching 201/202 this time. Re-verified again after
     // the fix - same counts, all groups still matched.
     //
+    // Second bug, same "side sidewalk" guess: you confirmed the sidewalks
+    // still weren't showing even after a hard refresh, so I checked
+    // Material.001/Plane.001's actual world geometry instead of trusting
+    // the earlier filename-coincidence match - it's a small (4x0.9,
+    // basically flat/2D) panel sitting ~3.4 units UP in the air, i.e. a
+    // wall-mounted sign/poster, not a ground-level sidewalk at all. So
+    // that "side sidewalk" identification was wrong from the start, and
+    // the "fix" above had still been overwriting a real wall panel's
+    // texture with sidewalk imagery. Reverted image 201 back to its
+    // original ("BakedTexture_Music") from the same pre-bug commit used
+    // above. Material.005/Plane.002 ("main pavement") checked out fine
+    // geometrically (61x61 flat plane at y~0 - genuinely the ground) and
+    // is left as the new bake. Still need the real side-sidewalk node
+    // identified (debug-HUD coordinates, same method as the bike/wall-clip
+    // fixes earlier) before that texture can go anywhere - not guessing a
+    // third time.
+    //
     // Missed two on that pass: PlasticCrate04_Cube.001 and
     // PlasticCrate05_Cube.001 weren't in bakedvinylnewtextures.glb (only
     // 02/03/06 were), so they got skipped even though they needed the same

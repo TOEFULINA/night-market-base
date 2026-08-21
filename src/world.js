@@ -976,6 +976,65 @@ async function addStreetScene(scene) {
 // alphaMode set on the material, not something to guess at from here.
 const LOKI_LOADING_TOKEN = 'loki-model-load';
 
+// imonloki.glb - "im sitting on top of the car" for the About Me section,
+// confirmed "the car" IS the Loki model right above. 35MB source, almost
+// entirely unused PBR maps: 10 character-part meshes (body/hair/eyes/
+// shorts/tank top/laces/a strap) each came with normal + occlusion +
+// metallicRoughness textures (some 4k, one 8.9MB alone) on top of the
+// baseColor map, none of which this site's unlit pipeline reads
+// (toUnlitFlat only ever looks at .map). Stripped every material down to
+// just its baseColorTexture and dropped the now-unreferenced image bytes
+// straight out of the file (not just ignored at runtime) - 35.0MB ->
+// 3.94MB. Also deliberately dropped the Details/laces material's
+// emissiveTexture (it had one, 49KB) rather than carrying it through:
+// toUnlitFlat treats ANY emissiveMap as "this is an LED sign, flicker it"
+// (see shading.js), which is correct for city signage and would have been
+// wrong here - shoelaces flickering like a neon sign. eyes_base_color had
+// no alpha channel at all (safe PNG->JPEG). Hair's alphaMode is BLEND in
+// the file - real cutout cards - left as PNG with alpha. body/shorts/tank/
+// lasjes have real alpha data too but no alphaMode set on their materials,
+// so same as Loki's own bake, they render OPAQUE per spec regardless -
+// left alone rather than guessing at intent.
+//
+// Placement: the 10 part-nodes' own translation/rotation/scale (all
+// checked directly in the exported file) put them at ordinary human-figure
+// proportions - basically already real-world-meter scale, no correction
+// needed. Loki's single node, by contrast, needed that ~0.0093 scale
+// factor to come down to real-world size from whatever much larger unit
+// Blender modeled it in. So this group is placed at Loki's node's own
+// world position/rotation (same spot in the city, facing the same way)
+// but WITHOUT inheriting Loki's scale - copying that too would shrink a
+// full human figure down to about 1% size. Exact seating/offset and the
+// camera framing for this section are still coming from you - this just
+// gets it sitting in the right neighborhood, not pixel-perfect yet.
+const IMONLOKI_LOADING_TOKEN = 'imonloki-model-load';
+
+async function addImOnLoki(scene, lokiNode) {
+  loadingManager.itemStart(IMONLOKI_LOADING_TOKEN);
+  try {
+    const { scene: me } = await loadModel('/models/IMONLOKI.glb');
+    me.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+    if (lokiNode) {
+      me.position.copy(lokiNode.position);
+      me.quaternion.copy(lokiNode.quaternion);
+      // scale intentionally NOT copied - see writeup above.
+    }
+    scene.add(me);
+  } catch (err) {
+    console.error('[imonloki] failed to load IMONLOKI.glb:', err);
+  } finally {
+    loadingManager.itemEnd(IMONLOKI_LOADING_TOKEN);
+  }
+}
+
 async function addLoki(scene) {
   loadingManager.itemStart(LOKI_LOADING_TOKEN);
   try {
@@ -990,6 +1049,7 @@ async function addLoki(scene) {
       obj.receiveShadow = true;
     });
     scene.add(loki);
+    addImOnLoki(scene, loki.children[0]);
   } catch (err) {
     console.error('[loki] failed to load LOKI.glb:', err);
   } finally {

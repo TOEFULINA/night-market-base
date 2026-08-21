@@ -937,6 +937,19 @@ document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
   li.addEventListener('click', () => {
     const route = li.dataset.route;
 
+    // "when you select something else from the menu the portfolio page
+    // should automatically close" - anything that ISN'T itself opening a
+    // portfolio category (Home, an Explore spot, Contact, About, or a
+    // different top-level item entirely) should close the gallery first,
+    // otherwise it just sits there on top (z-index 16-18) while whatever
+    // else was clicked tries to happen underneath/behind it. Picking a
+    // different Portfolio category is excluded on purpose - that already
+    // updates the same open gallery in place via openPortfolioGallery,
+    // no reason to close-then-reopen it.
+    if (!PORTFOLIO_CATEGORIES[route] && !portfolioGalleryEl.classList.contains('hidden')) {
+      closePortfolioGallery();
+    }
+
     // Home - reverses the title->walk flight back to the exact original
     // title framing (see startReturnToTitle/finishReturnToTitle above),
     // rather than a page reload. Controls.dispose()/VinylInteraction.dispose()

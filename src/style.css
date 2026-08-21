@@ -323,21 +323,19 @@ body.portfolio-open .submenu li {
   margin-top: 8px;
 }
 
-/* Sideways submenu - portfolio gallery pages ("open it to the right
-   instead of down while on portfolio pages") and the About Me overlay
-   ("open the menu horizontally on the about me page so it doesnt
-   interact or overlap w the text"). Both share the same reasoning: a
-   downward submenu would either get lost against the portfolio gallery's
-   own scrolling content or sit on top of the About text below it, so on
-   both pages it opens to the right of the label instead. #main-menu-list
-   li.has-submenu needs position:relative for the absolute-positioned
-   .submenu below to anchor off IT rather than the whole page. */
-body.portfolio-open #main-menu-list li.has-submenu,
-body.about-open #main-menu-list li.has-submenu {
+/* Sideways submenu - portfolio gallery pages only ("open it to the right
+   instead of down while on portfolio pages"). Tried the same treatment on
+   the About Me overlay too ("open the menu horizontally on the about me
+   page") but that page is narrower/more text-heavy and the sideways
+   submenu ended up overlapping the profile pic/header instead of the
+   downward one it was replacing - "not on about me" reverted that half,
+   this stays portfolio-only. #main-menu-list li.has-submenu needs
+   position:relative for the absolute-positioned .submenu below to anchor
+   off IT rather than the whole page. */
+body.portfolio-open #main-menu-list li.has-submenu {
   position: relative;
 }
-body.portfolio-open .has-submenu:hover .submenu,
-body.about-open .has-submenu:hover .submenu {
+body.portfolio-open .has-submenu:hover .submenu {
   position: absolute;
   top: 0;
   left: 100%;

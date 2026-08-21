@@ -909,17 +909,9 @@ const aboutBackToTopBtn = document.getElementById('about-back-to-top');
 
 function showAboutOverlay() {
   aboutOverlayEl?.classList.remove('hidden');
-  // "open the menu horizontally on the about me page so it doesnt
-  // interact or overlap w the text" - #main-menu is already visible/on
-  // top over the translucent About panel (no z-index/color fix needed
-  // like the opaque portfolio gallery below), just the submenu's open
-  // direction changes. Shares the sideways-submenu CSS rule with
-  // body.portfolio-open, see style.css.
-  document.body.classList.add('about-open');
 }
 function hideAboutOverlay() {
   aboutOverlayEl?.classList.add('hidden');
-  document.body.classList.remove('about-open');
 }
 aboutOverlayCloseBtn?.addEventListener('click', hideAboutOverlay);
 // "Back 2 Top" from the original page - this overlay is one scrolling

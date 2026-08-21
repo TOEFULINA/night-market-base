@@ -640,6 +640,28 @@ async function addStreetScene(scene) {
     // above - expected, vinyl is the one family that's deliberately staying
     // HD.
     //
+    // "updated baked maps for the loki car, the main sidewalk, and the side
+    // sidewalk" (BAKED MAIN PAVEMENT.png / SIDE SIDEWALK PROPERLIT.001.png
+    // / lokifullbake.png) - identified by checking directly, not guessing:
+    // Material.005 ("groundbake", node Plane.002) is the one this file
+    // already documents as the actual walkable ground plane, matching
+    // "main sidewalk." Material.001 (node Plane.001, old image name
+    // "BakedTexture_Music") matched by its baseColorTexture already being
+    // 1024x1024 same as the new upload, and its filename's ".001" suffix
+    // lining up with Blender's own auto-increment naming for that same
+    // material - "side sidewalk." Straight baseColorTexture swap on both,
+    // re-encoded JPEG (both materials are the file's usual OPAQUE default,
+    // no alphaMode set, so the new bakes' alpha-padding gets dropped same
+    // as everywhere else in this file). Loki's single material (LOKI.glb)
+    // got the same treatment - its new 1024x1024 bake is actually smaller
+    // than the 2048 one from this session's own earlier downscale pass, so
+    // LOKI.glb dropped 2.0MB -> 178KB on top of being a content update.
+    // Re-verified TRY7_SCENE.glb against verify_try7.mjs after the swap -
+    // same 689 meshes/340 materials, every tracked node-name group still
+    // matched (17/17, 14/14, 54/54, 6/6, 6/6) - a base-color-only texture
+    // swap doesn't touch node names/counts, but checked anyway rather than
+    // assuming.
+    //
     // Missed two on that pass: PlasticCrate04_Cube.001 and
     // PlasticCrate05_Cube.001 weren't in bakedvinylnewtextures.glb (only
     // 02/03/06 were), so they got skipped even though they needed the same

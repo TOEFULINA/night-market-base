@@ -43,9 +43,15 @@ Then open the local URL Vite prints.
     blender/
       consolidate_materials.py   Blender-side script to merge duplicate materials / cut draw-call count
 
+## Routing
+
+Each major destination has a real URL (`main.js`'s `ROUTE_PATHS`/`PORTFOLIO_CATEGORIES`) driven by the browser's History API, not a page reload: `/graphic-design`, `/illustration`, `/3d`, `/merchandise`, `/dynamics`, `/about`, `/contact`, `/records`, `/archive-shop`, `/prints-figures`, `/packaging`. Loading one of these paths directly opens straight to that destination — portfolio categories open immediately (they're a flat DOM overlay, not tied to the 3D scene loading), About/Contact/Explore spots wait for the scene to finish loading first since those need a real camera flight through it. Back/forward buttons work too.
+
+**Deploying:** because these are client-side routes with no real server-side page behind them, whatever host this ends up on needs to serve `index.html` for ALL paths, not 404 on a fresh load of e.g. `/graphic-design` — a `public/_redirects` file (Netlify) and `vercel.json` (Vercel) are already in place for those two. GitHub Pages doesn't support this natively; the common workaround there is copying `index.html` to a `404.html` in the built `dist/` output, since GitHub Pages serves `404.html` for any unmatched path.
+
 ## Known gaps / not wired up yet
 
-- Portfolio submenu items (Graphic Design, Illustration, Merchandise Design, Dynamics, 3D Modeling), Contact, and About don't have real destinations yet — clicking them just logs to the console.
+- Contact doesn't have a real destination yet (no wired camera spot) — clicking it just logs to the console. `/contact` is already mapped as a URL though, so it'll work automatically once a spot is picked.
 - Per-sign routing on the title screen isn't built — every sign currently enters walk mode at the default spawn.
 - `public/models/TRY7_SCENE.glb` is ~152MB (a few textures are intentionally kept HD - see below); this repo doesn't use Git LFS, so a fresh clone is a fairly large download. Worth moving to LFS (or a CDN) if that becomes a problem.
 

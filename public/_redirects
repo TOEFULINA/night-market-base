@@ -1,0 +1,5 @@
+# Client-side routing fallback for Netlify - "url.com/graphic-design"
+# etc. need to serve the same index.html the root URL does (main.js reads
+# window.location.pathname itself and opens the right page/gallery), not
+# a 404, since there's no real server-side route for these paths.
+/*    /index.html   200

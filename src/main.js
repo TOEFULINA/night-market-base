@@ -197,6 +197,42 @@ const LOCATIONS = {
   about: { x: -15.16, y: 1.3, z: -18.87, yawDeg: 170, pitchDeg: 17 },
 };
 
+// Real per-destination URLs - "i want diff places like portfolio pages to
+// open in diff pages like url.com/graphic-design" instead of everything
+// living only in in-memory JS state with one URL for the whole site.
+// Portfolio categories reuse PORTFOLIO_CATEGORIES' own `slug` field
+// directly (already existed for the /portfolio/<slug>/ manifest lookup) -
+// this object only needs to cover everything else. 'home' is the title
+// screen itself, mapped to the site root. 'contact' has no LOCATIONS entry
+// yet (not wired - see README's "known gaps"), but gets a path here too so
+// it starts working automatically the moment it IS wired, same as how
+// EXPLORE_ROUTE_ORDER already tolerates a not-yet-wired entry above.
+const ROUTE_PATHS = {
+  home: '/',
+  about: '/about',
+  contact: '/contact',
+  'explore-archive-shop': '/archive-shop',
+  'explore-records': '/records',
+  'explore-prints-figures': '/prints-figures',
+  'explore-packaging': '/packaging',
+};
+
+function pathForRoute(route) {
+  if (PORTFOLIO_CATEGORIES[route]) return `/${PORTFOLIO_CATEGORIES[route].slug}`;
+  return ROUTE_PATHS[route] || null;
+}
+
+// Reverse of the above - what route (if any) does a URL path landed on
+// (either typed directly or via browser back/forward) correspond to.
+function routeForPath(pathname) {
+  const slug = pathname.replace(/^\/|\/$/g, '');
+  if (!slug) return 'home';
+  const portfolioMatch = Object.entries(PORTFOLIO_CATEGORIES).find(([, v]) => v.slug === slug);
+  if (portfolioMatch) return portfolioMatch[0];
+  const otherMatch = Object.entries(ROUTE_PATHS).find(([, v]) => v === `/${slug}`);
+  return otherMatch ? otherMatch[0] : null;
+}
+
 // Cycling order for the </> Explore-nav arrows - matches index.html's
 // submenu order. 'explore-prints-figures' has no LOCATIONS entry yet (not
 // wired), so findAdjacentExploreRoute below just steps past it until you've
@@ -933,73 +969,115 @@ window.addEventListener('keydown', (e) => {
   else if (!aboutOverlayEl?.classList.contains('hidden')) hideAboutOverlay();
 });
 
+// Single dispatcher for "go to this route", used by menu clicks, browser
+// back/forward (popstate), and the initial deep-link check near
+// initLoadingUI() below - previously this logic only lived inline inside
+// the click listener, which meant back/forward and direct URL loads had
+// no way to trigger the exact same behavior a click would.
+// `pushHistory: false` is for cases where the URL already changed on its
+// own (popstate) or hasn't loaded yet (initial deep link) - pushing again
+// there would either fight the browser's own history navigation or push a
+// redundant duplicate entry before the page has even rendered once.
+function navigateToRoute(route, { pushHistory = true } = {}) {
+  // "when you select something else from the menu the portfolio page
+  // should automatically close" - anything that ISN'T itself opening a
+  // portfolio category (Home, an Explore spot, Contact, About, or a
+  // different top-level item entirely) should close the gallery first,
+  // otherwise it just sits there on top (z-index 16-18) while whatever
+  // else was clicked tries to happen underneath/behind it. Picking a
+  // different Portfolio category is excluded on purpose - that already
+  // updates the same open gallery in place via openPortfolioGallery,
+  // no reason to close-then-reopen it.
+  if (!PORTFOLIO_CATEGORIES[route] && !portfolioGalleryEl.classList.contains('hidden')) {
+    closePortfolioGallery();
+  }
+
+  if (pushHistory) {
+    const path = pathForRoute(route);
+    if (path && window.location.pathname !== path) {
+      history.pushState({ route }, '', path);
+    }
+  }
+
+  // Home - reverses the title->walk flight back to the exact original
+  // title framing (see startReturnToTitle/finishReturnToTitle above),
+  // rather than a page reload. Controls.dispose()/VinylInteraction.dispose()
+  // are what make this safe to do repeatedly - without them, each round
+  // trip would leave a stacked-up set of orphaned window/document-level
+  // input listeners behind.
+  if (route === 'home') {
+    startReturnToTitle();
+    return;
+  }
+
+  // Portfolio submenu items open the flat gallery overlay instead of
+  // flying anywhere in the 3D scene - checked before the LOCATIONS
+  // fallthrough below since these routes intentionally have no
+  // LOCATIONS entry (they were never meant to be 3D spots).
+  //
+  // "when youre in portfolio mode and then go back to main menu, it
+  // doesnt work until you reload" - collapseMainMenu() was firing
+  // unconditionally here, including on the TITLE screen, where the list
+  // is meant to stay permanently open/uncollapsed (see the logo-click
+  // handler above, which only toggles .collapsed in walk mode - "title
+  // screen already shows the list permanently, no toggle needed there").
+  // Collapsing it from title mode set #main-menu-list.collapsed
+  // (pointer-events: none, see style.css), and nothing on the title
+  // screen ever un-collapses it again - the logo click handler no-ops
+  // outside walk mode - so the whole corner menu went permanently dead
+  // the moment you opened a Portfolio category from the title screen,
+  // even after closing the gallery. Only collapse in walk mode, matching
+  // the logo handler's own guard.
+  if (PORTFOLIO_CATEGORIES[route]) {
+    openPortfolioGallery(route);
+    if (mode === 'walk') collapseMainMenu();
+    return;
+  }
+
+  if (!LOCATIONS[route]) {
+    console.log('[main menu] clicked:', route, '- no destination wired yet');
+    return;
+  }
+  if (mode === 'walk') {
+    // Already walking - fly straight there instead of the title->walk
+    // flight, and close the dropdown behind you same as picking a real
+    // destination normally would.
+    flyToLocation(route);
+    collapseMainMenu();
+  } else {
+    startTransition(route);
+  }
+}
+
 document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
-  li.addEventListener('click', () => {
-    const route = li.dataset.route;
-
-    // "when you select something else from the menu the portfolio page
-    // should automatically close" - anything that ISN'T itself opening a
-    // portfolio category (Home, an Explore spot, Contact, About, or a
-    // different top-level item entirely) should close the gallery first,
-    // otherwise it just sits there on top (z-index 16-18) while whatever
-    // else was clicked tries to happen underneath/behind it. Picking a
-    // different Portfolio category is excluded on purpose - that already
-    // updates the same open gallery in place via openPortfolioGallery,
-    // no reason to close-then-reopen it.
-    if (!PORTFOLIO_CATEGORIES[route] && !portfolioGalleryEl.classList.contains('hidden')) {
-      closePortfolioGallery();
-    }
-
-    // Home - reverses the title->walk flight back to the exact original
-    // title framing (see startReturnToTitle/finishReturnToTitle above),
-    // rather than a page reload. Controls.dispose()/VinylInteraction.dispose()
-    // are what make this safe to do repeatedly - without them, each round
-    // trip would leave a stacked-up set of orphaned window/document-level
-    // input listeners behind.
-    if (route === 'home') {
-      startReturnToTitle();
-      return;
-    }
-
-    // Portfolio submenu items open the flat gallery overlay instead of
-    // flying anywhere in the 3D scene - checked before the LOCATIONS
-    // fallthrough below since these routes intentionally have no
-    // LOCATIONS entry (they were never meant to be 3D spots).
-    //
-    // "when youre in portfolio mode and then go back to main menu, it
-    // doesnt work until you reload" - collapseMainMenu() was firing
-    // unconditionally here, including on the TITLE screen, where the list
-    // is meant to stay permanently open/uncollapsed (see the logo-click
-    // handler above, which only toggles .collapsed in walk mode - "title
-    // screen already shows the list permanently, no toggle needed there").
-    // Collapsing it from title mode set #main-menu-list.collapsed
-    // (pointer-events: none, see style.css), and nothing on the title
-    // screen ever un-collapses it again - the logo click handler no-ops
-    // outside walk mode - so the whole corner menu went permanently dead
-    // the moment you opened a Portfolio category from the title screen,
-    // even after closing the gallery. Only collapse in walk mode, matching
-    // the logo handler's own guard.
-    if (PORTFOLIO_CATEGORIES[route]) {
-      openPortfolioGallery(route);
-      if (mode === 'walk') collapseMainMenu();
-      return;
-    }
-
-    if (!LOCATIONS[route]) {
-      console.log('[main menu] clicked:', route, '- no destination wired yet');
-      return;
-    }
-    if (mode === 'walk') {
-      // Already walking - fly straight there instead of the title->walk
-      // flight, and close the dropdown behind you same as picking a real
-      // destination normally would.
-      flyToLocation(route);
-      collapseMainMenu();
-    } else {
-      startTransition(route);
-    }
-  });
+  li.addEventListener('click', () => navigateToRoute(li.dataset.route));
 });
+
+// Browser back/forward - re-run whatever route the URL now points at,
+// without pushing a NEW history entry (the browser already moved us to
+// this entry, pushState-ing again here would fight that). event.state is
+// whatever we stored in the pushState call that created this entry (see
+// navigateToRoute above); falls back to parsing the URL itself for the
+// very first entry (the initial page load, which never went through
+// pushState) or if state ever ends up missing for some other reason.
+window.addEventListener('popstate', (event) => {
+  const route = event.state?.route || routeForPath(window.location.pathname) || 'home';
+  navigateToRoute(route, { pushHistory: false });
+});
+
+// Deep-link entry - "url.com/graphic-design" should land you directly in
+// that gallery, not just be reachable by clicking through the menu after
+// the fact. Portfolio categories don't touch the 3D scene at all (own
+// manifest.json fetch, plain DOM overlay) so this fires immediately, before
+// the ~50MB TRY7_SCENE.glb even starts loading behind it - no reason to
+// force a full loading-screen wait just to see a flat image gallery.
+// About/Contact/Explore spots DO need the real 3D scene (an actual camera
+// flight through real geometry), so those are deferred to the
+// initLoadingUI() onComplete callback further below instead.
+const initialRoute = routeForPath(window.location.pathname);
+if (initialRoute && PORTFOLIO_CATEGORIES[initialRoute]) {
+  openPortfolioGallery(initialRoute);
+}
 
 // Social links (Instagram/Twitter/LinkedIn) - all three now have real hrefs
 // (index.html) and just navigate normally, no JS needed.
@@ -1042,7 +1120,15 @@ document.getElementById('explore-nav-next')?.addEventListener('click', () => {
 // way.
 const post = createPostProcessing(renderer, scene, camera);
 
-initLoadingUI();
+// Second half of the deep-link handling above - About/Contact/Explore
+// routes need the real 3D scene (camera flight through real geometry), so
+// those wait until the scene actually finishes loading instead of firing
+// immediately like the portfolio-category branch does.
+initLoadingUI(() => {
+  if (initialRoute && LOCATIONS[initialRoute]) {
+    navigateToRoute(initialRoute, { pushHistory: false });
+  }
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

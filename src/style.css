@@ -13,12 +13,13 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
 /* Loading screen redesign, per "for the loading screen lets use the same
    menu icon in the middle on a white background. give it a slight maybe
    like wobbling emoji, and have just a standalone percentage number in
-   helvetica instead of a loading bar" - white bg (was the dark #05060a
-   used everywhere else), #main-menu-logo's /logo.png reused here as
+   helvetica instead of a loading bar" (then corrected to black bg: "on a
+   black background my bad") - #main-menu-logo's /logo.png reused here as
    #loading-logo with its own gentle rotate-wobble keyframe (an emoji-style
    idle wiggle, not a spin), and the old #loading-bar-wrap/#loading-bar/
    #loading-label progress-bar markup replaced entirely by a single
-   standalone #loading-percent number set in Helvetica. */
+   standalone #loading-percent number set in Helvetica. Background matches
+   the site's usual dark #05060a instead of the white first pass. */
 #loading-screen {
   position: fixed;
   inset: 0;
@@ -27,8 +28,8 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background: #ffffff;
-  color: #05060a;
+  background: #05060a;
+  color: #f4e7c1;
   z-index: 20;
   transition: opacity 0.6s ease;
 }
@@ -51,7 +52,7 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   font-size: 22px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: #05060a;
+  color: #f4e7c1;
 }
 
 #intro-overlay {

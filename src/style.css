@@ -737,8 +737,16 @@ body.about-open #main-menu-list {
 .about-contact-location {
   color: #fff;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .about-contact-list a:hover { text-decoration: underline; }
+.about-contact-list svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
 
 .about-section-label {
   font-size: 18px;
@@ -877,19 +885,3 @@ body.about-open #main-menu-list {
 }
 #about-overlay-close:hover { opacity: 1; }
 
-/* Debug position readout - see the comment next to it in index.html */
-#debug-pos {
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  z-index: 15;
-  padding: 6px 10px;
-  background: rgba(5, 6, 10, 0.6);
-  color: #f4e7c1;
-  font-family: monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre;
-  pointer-events: none;
-  border-radius: 4px;
-}

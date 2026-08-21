@@ -117,11 +117,6 @@
     <button id="explore-nav-next" aria-label="Next location">&gt;</button>
   </div>
 
-  <!-- Debug position readout - for grabbing coordinates of spots you like
-       (e.g. a new spawn point) to hand back to Claude. Not part of the
-       final site - delete this div + its CSS + the updatePositionDebug()
-       call in main.js whenever you're done using it. -->
-  <div id="debug-pos"></div>
 
   <!-- Portfolio gallery overlay - the flat 2D side of the Portfolio submenu
        (Illustration/Graphic Design/3D Modeling/Merchandise Design/
@@ -212,13 +207,60 @@
              stacked feed of "update" boxes. -->
         <div class="about-columns">
           <div class="about-col-left">
+            <!-- Icons reuse the exact same hand-rolled inline SVGs as
+                 #social-links up top (currentColor, so .about-contact-list
+                 a's own color just works) instead of a new icon set -
+                 location pin and resume/document glyphs are the two new
+                 ones, same stroke-based style as the Instagram/LinkedIn
+                 icons above them. -->
             <ul class="about-contact-list">
-              <li class="about-contact-location">Manhattan, NY</li>
+              <li class="about-contact-location">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M12 22s7-7.4 7-13a7 7 0 1 0-14 0c0 5.6 7 13 7 13z" />
+                  <circle cx="12" cy="9" r="2.4" />
+                </svg>
+                Manhattan, NY
+              </li>
               <!-- Real resume PDF, pulled from your live toefu888.com/about-me page. -->
-              <li><a href="https://www.toefu888.com/_files/ugd/4ddd2b_957e41760be544e493c53f524993f088.pdf" target="_blank" rel="noopener noreferrer">Resume</a></li>
-              <li><a href="https://instagram.com/toefulina" target="_blank" rel="noopener noreferrer">Instagram</a></li>
-              <li><a href="https://twitter.com/LUVsicHEXALOGY" target="_blank" rel="noopener noreferrer">Twitter</a></li>
-              <li><a href="https://www.linkedin.com/in/miuppa/" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+              <li>
+                <a href="https://www.toefu888.com/_files/ugd/4ddd2b_957e41760be544e493c53f524993f088.pdf" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M6 2h9l5 5v15H6z" />
+                    <path d="M15 2v5h5" />
+                    <path d="M9 13h6M9 16.5h6" />
+                  </svg>
+                  Resume
+                </a>
+              </li>
+              <li>
+                <a href="https://instagram.com/toefulina" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="2" y="2" width="20" height="20" rx="5" />
+                    <circle cx="12" cy="12" r="4.2" />
+                    <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
+                  </svg>
+                  Instagram
+                </a>
+              </li>
+              <li>
+                <a href="https://twitter.com/LUVsicHEXALOGY" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23 4.9c-.8.4-1.7.6-2.6.8a4.5 4.5 0 0 0 2-2.5c-.9.5-1.9.9-2.9 1.1A4.5 4.5 0 0 0 11.9 8c0 .3 0 .7.1 1A12.7 12.7 0 0 1 2.7 3.9a4.5 4.5 0 0 0 1.4 6 4.4 4.4 0 0 1-2-.6v.1a4.5 4.5 0 0 0 3.6 4.4 4.5 4.5 0 0 1-2 .1 4.5 4.5 0 0 0 4.2 3.1A9 9 0 0 1 1 19.5 12.7 12.7 0 0 0 7.9 21.5c8.3 0 12.8-6.9 12.8-12.8v-.6c.9-.6 1.6-1.4 2.3-2.2z" />
+                  </svg>
+                  Twitter
+                </a>
+              </li>
+              <li>
+                <a href="https://www.linkedin.com/in/miuppa/" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="2" y="2" width="20" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+                    <circle cx="7.5" cy="8" r="1.4" />
+                    <rect x="6.3" y="10.5" width="2.4" height="7.5" />
+                    <path d="M11.5 10.5h2.3v1.1c.4-.7 1.3-1.3 2.6-1.3 2.1 0 3 1.3 3 3.7v4h-2.4v-3.6c0-1-.4-1.7-1.3-1.7-.9 0-1.4.6-1.4 1.7v3.6h-2.4v-7.5z" />
+                  </svg>
+                  LinkedIn
+                </a>
+              </li>
             </ul>
 
             <h3 class="about-section-label">Clients</h3>

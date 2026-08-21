@@ -103,7 +103,6 @@ let vinylBound = false;
 // once" state in this project.
 let hasEnteredWalkModeBefore = false;
 
-const debugPosEl = document.getElementById('debug-pos');
 const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 
@@ -131,12 +130,6 @@ function showWelcomeBubble() {
 // (pointer-events only turn on once .visible, see style.css), just a
 // courtesy for anyone who reads fast and wants it gone sooner.
 welcomeBubbleEl?.addEventListener('click', dismissWelcomeBubble);
-// Hidden while on the title screen per your ask - it used to double as a
-// hover readout there ("title screen - click a sign" / "hovering: X"), but
-// that's gone now (still logging to console on click below, just not
-// painted in the corner anymore). Shown again once you're in walk mode,
-// where it's back to being the x/y/z/yaw debug readout it was originally.
-if (debugPosEl) debugPosEl.style.display = 'none';
 
 const titleScreen = new TitleScreen(scene, renderer, {
   onEnter: (signName) => {
@@ -360,7 +353,6 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
-  if (debugPosEl) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout
 
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
@@ -776,7 +768,6 @@ function finishReturnToTitle() {
   socialLinksEl?.classList.remove('hidden');
   vinylExitBtn?.classList.add('hidden'); // defensive - vinylInteraction.dispose() above didn't fire onUnlocked
   dismissWelcomeBubble(); // in case you hit Home while it was still up
-  if (debugPosEl) debugPosEl.style.display = 'none';
 }
 
 // Corner nav overlay (PORTFOLIO / EXPLORE / CONTACT / ABOUT) - separate
@@ -1172,28 +1163,6 @@ const FOG_DRIFT_PERIOD = 38; // seconds per full cycle
 // but spends more of each cycle sitting close to true black.
 const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 
-// Debug position readout, back per your ask - for grabbing an exact spawn
-// point in FURNISHEDSCENE915.glb's coordinate space (the current spawn is
-// just a rough edge-of-bounding-box guess). See the comment in index.html -
-// delete the #debug-pos div (index.html + style.css) and this block once
-// you've picked a spot and don't need it anymore. Doubles as the title-
-// screen hover readout above while mode === 'title'.
-function updatePositionDebug() {
-  if (!debugPosEl || !controls) return;
-  const p = controls.camera.position;
-  const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
-  // Pitch, added per "i need to be looking head angled exactly, not just
-  // the position. add more reference coordinates" - x/y/z/yaw alone can't
-  // capture a tilted-up shot like the About Me framing screenshot,
-  // LOCATIONS/flyToLocation/startTransition only ever hardcoded pitch to
-  // 0 before this. controls.pitch is radians, +/-1.2 clamp (~+/-68.7°),
-  // positive = looking up (see controls.js's drag handler).
-  const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);
-  let text = `x: ${p.x.toFixed(2)}\ny: ${p.y.toFixed(2)}\nz: ${p.z.toFixed(2)}\nyaw: ${yawDeg}°\npitch: ${pitchDeg}°`;
-  text += `\nstreet: ${streetSceneStatus.state} ${streetSceneStatus.detail}`;
-  debugPosEl.textContent = text;
-}
-
 function tick() {
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
@@ -1251,7 +1220,6 @@ function tick() {
     controls?.update(delta); // null for one frame if a Home flight just finished above - no-ops itself while locked either way
     vinylInteraction?.update(delta); // no-ops unless a lock-in/out transition is in progress
     updateExploreNavVisibility(); // hides the </> arrows the moment you move away from an Explore spot
-    updatePositionDebug();
 
     post.tiltShiftPass.enabled = orthoActive;
     // Distance blur - walk mode's perspective camera only, and only once

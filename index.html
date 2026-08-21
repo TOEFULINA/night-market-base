@@ -131,7 +131,10 @@
        main.js's openPortfolioGallery() - file lists are long/messy
        (real export filenames), not hardcoded here. -->
   <div id="portfolio-gallery" class="hidden">
-    <button id="portfolio-gallery-close" aria-label="Close">&times;</button>
+    <!-- "remove the x" - the corner nav (visible on portfolio pages, see
+         body.portfolio-open in style.css) plus Escape already close this,
+         so the dedicated close button was redundant - and it was
+         crowding the title in the same top-right corner. -->
     <!-- Title stays a direct (non-scrolling) child of #portfolio-gallery -
          "one part of the site at the top should stay anchored so it
          doesnt just feel like its scaled weird": with the grid below now a

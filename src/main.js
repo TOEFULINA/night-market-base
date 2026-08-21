@@ -782,7 +782,6 @@ document.getElementById('main-menu-logo')?.addEventListener('click', () => {
 const portfolioGalleryEl = document.getElementById('portfolio-gallery');
 const portfolioGalleryTitleEl = document.getElementById('portfolio-gallery-title');
 const portfolioGalleryGridEl = document.getElementById('portfolio-gallery-grid');
-const portfolioGalleryCloseBtn = document.getElementById('portfolio-gallery-close');
 const portfolioLightboxEl = document.getElementById('portfolio-lightbox');
 const portfolioLightboxContentEl = document.getElementById('portfolio-lightbox-content');
 const portfolioLightboxCloseBtn = document.getElementById('portfolio-lightbox-close');
@@ -887,7 +886,6 @@ function closePortfolioGallery() {
   document.body.classList.remove('portfolio-open');
 }
 
-portfolioGalleryCloseBtn?.addEventListener('click', closePortfolioGallery);
 portfolioLightboxCloseBtn?.addEventListener('click', closePortfolioLightbox);
 // Click the dimmed backdrop (not the media itself) to dismiss the lightbox.
 portfolioLightboxEl?.addEventListener('click', (e) => {

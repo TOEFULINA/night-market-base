@@ -60,9 +60,28 @@ const LOCK_CAMERA_OFFSET = new THREE.Vector3(0, 0.5, -1.0);
 // mesh, not that anything is actually blocking the line of sight.
 const INTERACT_RANGE = 4;
 const LOCK_TRANSITION_SECONDS = 0.7;
+// "when you click on the record player, i want it to not just have the
+// record appear, but animate like its being put onto it" - was an instant
+// this.recordDisc.visible = true with zero motion. Now it starts lifted
+// DISC_DROP_HEIGHT above its actual resting transform (the position/
+// rotation the record already has in the GLB - that part was never wrong,
+// just revealed with no motion behind it) and eases down onto the player
+// over DISC_DROP_SECONDS, running alongside the camera's zoom-in rather
+// than blocking it - by the time the lock-in transition finishes, the
+// record's already settled, so you're not left waiting on two separate
+// animations back to back.
+const DISC_DROP_HEIGHT = 0.35; // world units the record starts above its resting spot
+const DISC_DROP_SECONDS = 0.55; // finishes a bit before LOCK_TRANSITION_SECONDS so it's settled, not still falling, once the zoom lands
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// Decelerating settle (fast start, slow finish) - reads like a hand
+// lowering the record and easing off just before it touches down, not a
+// physics drop that would still be speeding up at contact.
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 export class VinylInteraction {
@@ -90,6 +109,10 @@ export class VinylInteraction {
     this._transitioning = false;
     this._transitionReverse = false;
     this._transitionT = 0;
+
+    this._discRestY = 0; // set for real once bindTarget resolves the disc
+    this._discDropping = false;
+    this._discDropT = 0;
     this._transFromPos = new THREE.Vector3();
     this._transFromQuat = new THREE.Quaternion();
     this._transToPos = new THREE.Vector3();
@@ -118,6 +141,7 @@ export class VinylInteraction {
     const disc = street.getObjectByName(RECORD_DISC_NODE_NAME);
     if (disc && disc.isMesh) {
       this.recordDisc = disc;
+      this._discRestY = disc.position.y; // its real, correct resting height - the drop animation lerps back to this, never past it
       this.recordDisc.visible = false; // hidden until locked in - see the constant's writeup above
     } else {
       console.warn(`[vinyl interaction] ${RECORD_DISC_NODE_NAME} not found in TRY7_SCENE - skipping the record reveal`);
@@ -159,7 +183,14 @@ export class VinylInteraction {
     // "shown when the record player is clicked on" - reveal immediately on
     // click, not once the zoom-in transition finishes, so it's there the
     // whole time you're approaching rather than popping in after the fact.
-    if (this.recordDisc) this.recordDisc.visible = true;
+    // Starts lifted DISC_DROP_HEIGHT above its resting spot and eases down
+    // over the drop below, instead of just popping in at rest.
+    if (this.recordDisc) {
+      this.recordDisc.visible = true;
+      this.recordDisc.position.y = this._discRestY + DISC_DROP_HEIGHT;
+      this._discDropping = true;
+      this._discDropT = 0;
+    }
     this._savedYaw = this.controls.yaw;
     this._savedPitch = this.controls.pitch;
     this._savedPos.copy(this.camera.position);
@@ -189,6 +220,19 @@ export class VinylInteraction {
   // what drives the camera instead during both the transition and the held
   // lock.
   update(delta) {
+    // Runs independently of the camera transition below - it's shorter
+    // (DISC_DROP_SECONDS < LOCK_TRANSITION_SECONDS) and started at the same
+    // moment in _lockIn(), so it's always done well before the early-return
+    // below would ever cut it off, but keeping it out of that guard means
+    // it can't silently get skipped if the durations ever change relative
+    // to each other.
+    if (this._discDropping && this.recordDisc) {
+      this._discDropT += delta / DISC_DROP_SECONDS;
+      const dt = easeOutCubic(Math.min(this._discDropT, 1));
+      this.recordDisc.position.y = THREE.MathUtils.lerp(this._discRestY + DISC_DROP_HEIGHT, this._discRestY, dt);
+      if (this._discDropT >= 1) this._discDropping = false;
+    }
+
     if (!this._transitioning) return;
     this._transitionT += delta / LOCK_TRANSITION_SECONDS;
     const t = easeInOutCubic(Math.min(this._transitionT, 1));

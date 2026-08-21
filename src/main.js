@@ -888,9 +888,23 @@ document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
     // flying anywhere in the 3D scene - checked before the LOCATIONS
     // fallthrough below since these routes intentionally have no
     // LOCATIONS entry (they were never meant to be 3D spots).
+    //
+    // "when youre in portfolio mode and then go back to main menu, it
+    // doesnt work until you reload" - collapseMainMenu() was firing
+    // unconditionally here, including on the TITLE screen, where the list
+    // is meant to stay permanently open/uncollapsed (see the logo-click
+    // handler above, which only toggles .collapsed in walk mode - "title
+    // screen already shows the list permanently, no toggle needed there").
+    // Collapsing it from title mode set #main-menu-list.collapsed
+    // (pointer-events: none, see style.css), and nothing on the title
+    // screen ever un-collapses it again - the logo click handler no-ops
+    // outside walk mode - so the whole corner menu went permanently dead
+    // the moment you opened a Portfolio category from the title screen,
+    // even after closing the gallery. Only collapse in walk mode, matching
+    // the logo handler's own guard.
     if (PORTFOLIO_CATEGORIES[route]) {
       openPortfolioGallery(route);
-      collapseMainMenu();
+      if (mode === 'walk') collapseMainMenu();
       return;
     }
 

@@ -286,6 +286,9 @@ export function buildWorld(scene, renderer) {
 
   addStreetScene(scene);
   addLoki(scene);
+  addMe(scene);
+  addBike(scene);
+  addTiles(scene);
   // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
   // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
   // directly into the main scene (node tripo_node_...001, loaded as part of
@@ -1043,43 +1046,143 @@ async function addStreetScene(scene) {
 // alphaMode set on the material, not something to guess at from here.
 const LOKI_LOADING_TOKEN = 'loki-model-load';
 
-// imonloki.glb - "im sitting on top of the car" for the About Me section,
-// confirmed "the car" IS the Loki model right above. 35MB source, almost
-// entirely unused PBR maps: 10 character-part meshes (body/hair/eyes/
-// shorts/tank top/laces/a strap) each came with normal + occlusion +
-// metallicRoughness textures (some 4k, one 8.9MB alone) on top of the
-// baseColor map, none of which this site's unlit pipeline reads
-// (toUnlitFlat only ever looks at .map). Stripped every material down to
-// just its baseColorTexture and dropped the now-unreferenced image bytes
-// straight out of the file (not just ignored at runtime) - 35.0MB ->
-// 3.94MB. Also deliberately dropped the Details/laces material's
-// emissiveTexture (it had one, 49KB) rather than carrying it through:
-// toUnlitFlat treats ANY emissiveMap as "this is an LED sign, flicker it"
-// (see shading.js), which is correct for city signage and would have been
-// wrong here - shoelaces flickering like a neon sign. eyes_base_color had
-// no alpha channel at all (safe PNG->JPEG). Hair's alphaMode is BLEND in
-// the file - real cutout cards - left as PNG with alpha. body/shorts/tank/
-// lasjes have real alpha data too but no alphaMode set on their materials,
-// so same as Loki's own bake, they render OPAQUE per spec regardless -
-// left alone rather than guessing at intent.
-//
-// Placement: the 10 part-nodes' own translation/rotation/scale (all
-// checked directly in the exported file) put them at ordinary human-figure
-// proportions - basically already real-world-meter scale, no correction
-// needed. Loki's single node, by contrast, needed that ~0.0093 scale
-// factor to come down to real-world size from whatever much larger unit
-// Blender modeled it in. So this group is placed at Loki's node's own
-// world position/rotation (same spot in the city, facing the same way)
-// but WITHOUT inheriting Loki's scale - copying that too would shrink a
-// full human figure down to about 1% size. Exact seating/offset and the
-// camera framing for this section are still coming from you - this just
-// gets it sitting in the right neighborhood, not pixel-perfect yet.
-const IMONLOKI_LOADING_TOKEN = 'imonloki-model-load';
+// imonloki.glb - RETIRED. "the origins were super crazy" (your words) -
+// the old 10-node character group's own transforms didn't put it in the
+// right spot, which is why addImOnLoki() used to reach over and manually
+// copy Loki's position/quaternion onto it instead of trusting its own
+// export, the one exception to this file's usual "trust the export"
+// rule. Replaced by ME.glb below, split out of
+// floortilescarandfinalbiemeglb.glb - "some new bakes pacled and proper
+// geometry origins for the model of me" - a re-export where the character
+// is back to being one correctly-origined node again, so it goes through
+// the normal own-transform path like everything else now (see addMe()).
+// IMONLOKI.glb itself left in public/models/ rather than deleted, same
+// "don't touch files you're not sure about" caution as other retirements
+// in this file.
 
-async function addImOnLoki(scene, lokiNode) {
-  loadingManager.itemStart(IMONLOKI_LOADING_TOKEN);
+// floortilescarandfinalbiemeglb.glb - one combined re-export bundling
+// three separate fixes in a single file: "the origins were super crazy.
+// gonna send a new version with correct origins and a new bike bake and
+// proper tiles, they werent packed" (message right before the upload),
+// then "some new bakes pacled and proper geometry origins for the model
+// of me" with the file itself. Split into three standalone glbs (ME.glb,
+// BIKE.glb, TILES.glb) rather than wired in as one combined scene, since
+// each piece already carries its own correct world transform and there's
+// no reason to couple their load/error states together.
+//
+// Splitting method: the source is Draco-compressed
+// (KHR_draco_mesh_compression, required) - rather than decoding/
+// re-encoding geometry, each piece's compressed bufferViews were copied
+// through byte-for-byte and just re-indexed into a smaller per-piece
+// glTF (accessors/meshes/materials/textures/images/bufferViews all
+// pruned to only what that piece actually uses). Geometry itself is
+// therefore bit-identical to your export, nothing lossy happened there.
+//
+// Materials were stripped the same way IMONLOKI.glb's were (see the
+// retirement note above) and for the same reason: this scene's pipeline
+// renders everything through toUnlitFlat, which only ever reads
+// pbrMetallicRoughness.baseColorTexture - so normalTexture/
+// occlusionTexture/metallicRoughnessTexture/the KHR_materials_specular
+// extension (all present on nearly every material in this upload) were
+// dead weight, and emissiveTexture/emissiveFactor were dropped outright
+// so nothing in this batch accidentally inherits toUnlitFlat's "any
+// emissiveMap = flicker like an LED sign" behavior (shading.js) - correct
+// for street signage, wrong for a bike headlight or a shoelace. alphaMode
+// was left exactly as authored per material (this file's usual "OPAQUE
+// unless BLEND/MASK is explicitly set" rule) - the two materials that did
+// have alphaMode: BLEND (hair, and one bike decal/sticker material) kept
+// their alpha channel; everything else went PNG/JPEG->JPEG since the
+// alpha would've been discarded at render time anyway.
+//
+// Baked textures downscaled/re-encoded on top of that (same "shrink the
+// bake, don't touch the mesh" move as every other rebake in this file):
+// tiles/bike capped at 2048/1536 JPEG q85, the "me" character's alpha-
+// carrying hair PNG capped at 1024. Total: 5.25MB->0.58MB (tiles),
+// 0.90MB->0.39MB (bike), 7.95MB->1.72MB (me).
+
+// TILES.glb - "proper tiles, they werent packed" - the main pavement +
+// side sidewalk ground planes, now real merged geometry (not just a
+// texture swap attempted twice before and reverted, see the
+// groundbake/"side sidewalk" history further down this file). Two flat
+// top-level nodes (Object040 = main pavement, ~39x1x43 world units;
+// Object041 = side sidewalk, similar span), each placed at its own
+// exported translation/rotation/scale - same trust-the-export handling as
+// every other standalone model in this file.
+const TILES_LOADING_TOKEN = 'tiles-model-load';
+
+async function addTiles(scene) {
+  loadingManager.itemStart(TILES_LOADING_TOKEN);
   try {
-    const { scene: me } = await loadModel('/models/IMONLOKI.glb');
+    const { scene: tiles } = await loadModel('/models/TILES.glb');
+    tiles.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.receiveShadow = true;
+    });
+    scene.add(tiles);
+  } catch (err) {
+    console.error('[tiles] failed to load TILES.glb:', err);
+  } finally {
+    loadingManager.itemEnd(TILES_LOADING_TOKEN);
+  }
+}
+
+// BIKE.glb - "a new bike bake" - turns out to be FOUR separate parked
+// bikes strung along the sidewalk (x from about +13.8 down to -16.2 at
+// z~-19), not four parts of one bike - this is very likely the same
+// "these bikes have this weird material can we make it black instead"
+// white-material issue from before, which you deferred with "ignore ill
+// re export" - this looks like that re-export. Each of the 4 nodes keeps
+// its own exported transform. NOTE: the OLD white-material bikes may
+// still be sitting inside TRY7_SCENE.glb at roughly this same spot (never
+// conclusively identified/removed - see the deferred investigation
+// earlier in this file) - if these show up doubled/overlapping in-game,
+// that's the old geometry still underneath, not a bug in this addition;
+// flag it and I'll go find the old nodes to hide once you've seen it.
+const BIKE_LOADING_TOKEN = 'bike-model-load';
+
+async function addBike(scene) {
+  loadingManager.itemStart(BIKE_LOADING_TOKEN);
+  try {
+    const { scene: bike } = await loadModel('/models/BIKE.glb');
+    bike.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const unlit = toUnlitFlat(rawMat);
+      rawMat.dispose();
+      obj.material = unlit;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+    scene.add(bike);
+  } catch (err) {
+    console.error('[bike] failed to load BIKE.glb:', err);
+  } finally {
+    loadingManager.itemEnd(BIKE_LOADING_TOKEN);
+  }
+}
+
+// ME.glb - the "About Me" character, replacing IMONLOKI.glb (see the
+// retirement note above). Single node this time (Tube.001, 9 primitives -
+// hair/face/body/eyes/shorts/tank/shoes/details, same material set as the
+// old file) instead of 10 separate part-nodes, and per "proper geometry
+// origins for the model of me" its own translation is now the correct
+// world placement directly - checked: (-16.08, 2.20, -17.67), right at
+// Loki's spot and about 2.2 units up, i.e. sitting on the car roof/hood,
+// which is exactly "im sitting on top of the car." No more borrowing
+// Loki's position/quaternion and skipping its scale (the old IMONLOKI
+// workaround) - this node's own scale (~0.0248, close to Loki's own
+// ~0.0254 tile/bike scale) is trusted as-is, same as everything else in
+// this shared re-export batch.
+const ME_LOADING_TOKEN = 'me-model-load';
+
+async function addMe(scene) {
+  loadingManager.itemStart(ME_LOADING_TOKEN);
+  try {
+    const { scene: me } = await loadModel('/models/ME.glb');
     me.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
@@ -1089,16 +1192,11 @@ async function addImOnLoki(scene, lokiNode) {
       obj.castShadow = true;
       obj.receiveShadow = true;
     });
-    if (lokiNode) {
-      me.position.copy(lokiNode.position);
-      me.quaternion.copy(lokiNode.quaternion);
-      // scale intentionally NOT copied - see writeup above.
-    }
     scene.add(me);
   } catch (err) {
-    console.error('[imonloki] failed to load IMONLOKI.glb:', err);
+    console.error('[me] failed to load ME.glb:', err);
   } finally {
-    loadingManager.itemEnd(IMONLOKI_LOADING_TOKEN);
+    loadingManager.itemEnd(ME_LOADING_TOKEN);
   }
 }
 
@@ -1116,7 +1214,6 @@ async function addLoki(scene) {
       obj.receiveShadow = true;
     });
     scene.add(loki);
-    addImOnLoki(scene, loki.children[0]);
   } catch (err) {
     console.error('[loki] failed to load LOKI.glb:', err);
   } finally {

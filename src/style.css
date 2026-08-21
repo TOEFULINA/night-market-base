@@ -220,7 +220,14 @@ body.portfolio-open .submenu li {
 body.portfolio-open #main-menu,
 body.about-open #main-menu {
   flex-direction: row;
-  align-items: flex-start;
+  /* Center, not flex-start - "its not vertically centered with logo and
+     design title". This is the OUTER row (logo vs. the whole menu list
+     block) - separate from #main-menu-list's own flex-start below, which
+     is about the list's INNER items staying level with each other and is
+     unaffected by this. The list's text (~30px tall) is shorter than the
+     logo (~64x59px), so flex-start here was leaving it sitting near the
+     logo's top instead of centered against it. */
+  align-items: center;
   gap: 32px;
 }
 body.portfolio-open #main-menu-list,
@@ -492,8 +499,16 @@ body.about-open #main-menu-list {
      (see body.portfolio-open in the #main-menu rules above) and the two
      were overlapping. */
   position: fixed;
-  top: 44px;
+  /* top:40px to match #main-menu's own top, then line-height (not
+     padding/margin) does the vertical centering - 59px is
+     #main-menu-logo's actual rendered height (64px wide, image's real
+     1516x1397 aspect ratio), so a single line of text vertically centers
+     in a box exactly as tall as the logo instead of both being
+     independently-guessed pixel offsets that drift out of sync
+     ("its not vertically centered with logo and design title"). */
+  top: 40px;
   right: 40px;
+  line-height: 59px;
   text-align: right;
   z-index: 17; /* above the scrolling grid content */
   margin: 0;

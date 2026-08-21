@@ -123,6 +123,28 @@
        call in main.js whenever you're done using it. -->
   <div id="debug-pos"></div>
 
+  <!-- Portfolio gallery overlay - the flat 2D side of the Portfolio submenu
+       (Illustration/Graphic Design/3D Modeling/Merchandise Design/
+       Dynamics), separate from the 3D Explore side entirely. Opens on top
+       of whatever's behind it (title screen or walk mode) rather than
+       flying anywhere. Populated from public/portfolio/manifest.json by
+       main.js's openPortfolioGallery() - file lists are long/messy
+       (real export filenames), not hardcoded here. -->
+  <div id="portfolio-gallery" class="hidden">
+    <button id="portfolio-gallery-close" aria-label="Close">&times;</button>
+    <h2 id="portfolio-gallery-title"></h2>
+    <div id="portfolio-gallery-grid"></div>
+  </div>
+
+  <!-- Lightbox - full-size view of whatever tile you click in the grid
+       above. Images and the Dynamics category's video clips both go
+       through this same overlay (main.js swaps in an <img> or <video>
+       depending on the asset). -->
+  <div id="portfolio-lightbox" class="hidden">
+    <button id="portfolio-lightbox-close" aria-label="Close">&times;</button>
+    <div id="portfolio-lightbox-content"></div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -155,7 +155,17 @@ export function buildWorld(scene, renderer) {
   // note above) - now it starts creeping in close, just past arm's reach.
   // far pulled in too, 55 -> 42, so the ramp to full opacity is steeper/
   // thicker rather than just starting earlier at the same old gentle slope.
-  scene.fog = new THREE.Fog(0x4c4657, 10, 42);
+  // "also turn the fog black" - color only, 0x4c4657 (greyish-purple) ->
+  // 0x000000, near/far untouched. main.js's tick() drift (streetFog, the
+  // "slightly dynamic" lightness breathe) reads its base HSL straight off
+  // this color at module load, so it stays in sync automatically - black's
+  // H/S are both 0, so the drift just nudges lightness between 0 and
+  // +0.04, a faint near-black pulse rather than a color shift. Left
+  // scene.background's gradient (horizon ~0x403d48) alone - you've drawn
+  // that distinction before ("you asked for the background specifically
+  // this round, left fog as-is"), so treating this the same way rather
+  // than assuming black fog implies a black background too.
+  scene.fog = new THREE.Fog(0x000000, 10, 42);
   // Desaturated background further per "very greyish purple" - pushed the
   // same gray-blend technique from ~30% to ~65%, background only (you
   // asked for the background specifically this round, left fog as-is):

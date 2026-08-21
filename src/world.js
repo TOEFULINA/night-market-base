@@ -662,6 +662,24 @@ async function addStreetScene(scene) {
     // swap doesn't touch node names/counts, but checked anyway rather than
     // assuming.
     //
+    // BUG + fix, same session: the first pass above patched images 227/228
+    // - those numbers came from material.baseColorTexture.index, which is
+    // a TEXTURE array index, not an image array index. This file's
+    // texture[i].source != i for 291 of its 301 textures (no 1:1 identity
+    // mapping, unlike LOKI.glb/IMONLOKI.glb's simpler single/1:1 texture
+    // lists, which is why those two patched correctly on the first try).
+    // Textures 227/228 actually point at images 201/202 - so the real
+    // groundbake/BakedTexture_Music never got touched (you weren't seeing
+    // the new sidewalk bakes because they were never applied), and two
+    // unrelated materials (Material_3 "yb kkr baked", Material_#1111225164.005
+    // "CHRISPATRICK BAKED") got the sidewalk images stamped onto them by
+    // mistake instead. Fixed by resolving texture->image indirection
+    // properly (material -> textures[bct.index] -> images[texture.source])
+    // before touching any bufferView, restoring 227/228 from the commit
+    // before this bug (git show <precommit>:public/models/TRY7_SCENE.glb),
+    // and correctly patching 201/202 this time. Re-verified again after
+    // the fix - same counts, all groups still matched.
+    //
     // Missed two on that pass: PlasticCrate04_Cube.001 and
     // PlasticCrate05_Cube.001 weren't in bakedvinylnewtextures.glb (only
     // 02/03/06 were), so they got skipped even though they needed the same

@@ -35,10 +35,24 @@ const camera = new THREE.PerspectiveCamera(
 // mode, never behind the title screen's sign-building view.
 camera.layers.enable(1);
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+// Mobile crash root-cause part 2: the GLB texture swap (see world.js's
+// IS_MOBILE/modelPath) cut decoded texture VRAM from ~1GB to ~270MB, but
+// the actual Safari crash ("A problem repeatedly occurred") still happened
+// right as loading hit 100% - i.e. the exact moment everything gets
+// uploaded to the GPU AND the composer/shadow-map render targets below get
+// allocated for the first time. Those render targets are framebuffer
+// memory, completely separate from texture VRAM, and none of them were
+// scaled down for mobile before now - antialias MSAA buffers, the full
+// EffectComposer ping-pong pair, and a 2048x2048 shadow map, all sized off
+// devicePixelRatio. Cutting all three for mobile specifically.
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, powerPreference: 'high-performance' });
 // cap pixel ratio - rendering at full 3x retina resolution on a phone is a
 // straightforward, easy-to-miss way to tank frame rate for no visible gain.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Capped further to 1x on mobile - every full-screen render target below
+// (composer buffers, shadow map, depth target) scales with this squared,
+// so 2x -> 1x is a 4x cut in framebuffer memory on top of the texture cut.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Real-time shadows, turned on per your call - the flat/shadowless look
 // was the actual complaint, and this scene is small/compact enough
@@ -48,7 +62,11 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 // pixel, but reads far less "video-gamey"/aliased than the hard default.
 // See world.js for the actual light's shadow-camera setup (tightly fit to
 // the scene bounds, not this file).
-renderer.shadowMap.enabled = true;
+// Disabled entirely on mobile - a 2048x2048 depth render target was one of
+// the uncounted framebuffer costs above, and the scene's baked textures
+// already carry their own lighting/shadow information, so this is a real
+// but comparatively minor visual tradeoff for not crashing.
+renderer.shadowMap.enabled = !IS_MOBILE;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // filmic tone mapping - ACES is what keeps bright reflections/highlights
 // from just blowing out to flat white. Exposure dropped 1.1 -> 0.85 - the

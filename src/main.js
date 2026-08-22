@@ -126,6 +126,7 @@ let hasEnteredWalkModeBefore = false;
 const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
+const debugPosEl = document.getElementById('debug-pos'); // back per your ask, see index.html's comment on this element
 
 // Vinyl sample booth - "i want to be able to play songs and swap out the
 // cover. like a booth where u can sample." Filler content for now ("can
@@ -275,6 +276,9 @@ function showWelcomeBubble() {
 // (pointer-events only turn on once .visible, see style.css), just a
 // courtesy for anyone who reads fast and wants it gone sooner.
 welcomeBubbleEl?.addEventListener('click', dismissWelcomeBubble);
+// Hidden while on the title screen - shown again once you're in walk mode,
+// where it's the x/y/z/yaw/pitch debug readout.
+if (debugPosEl) debugPosEl.style.display = 'none';
 
 const titleScreen = new TitleScreen(scene, renderer, {
   onEnter: (signName) => {
@@ -333,6 +337,18 @@ const LOCATIONS = {
   // LOCATIONS/flyToLocation path every other menu destination uses, so
   // clicking "About" flies here the same way Explore items do.
   about: { x: -15.16, y: 1.3, z: -18.87, yawDeg: 170, pitchDeg: 17 },
+  // Close-up on the vinyl wall display - "i want the camera to snap to this
+  // wall display" - debug-HUD coordinates off your screenshot standing right
+  // in front of it (x:-6.93, y:1.30, z:-13.57, yaw:270°, pitch:0°). Not an
+  // Explore-menu stop, just a flyToLocation target for the click-to-zoom
+  // interactive below (RECORD_WALL_NODE_NAMES) - not in EXPLORE_ROUTE_ORDER,
+  // so activateExploreNavIfApplicable's </> arrows correctly stay hidden here.
+  'record-wall-display': { x: -6.93, y: 1.3, z: -13.57, yawDeg: 270 },
+  // Bookshelf close-up - "i also wanna run a camera snap to here for any of
+  // those shelf objects" - debug-HUD coordinates off your screenshot
+  // standing in front of it (x:1.72, y:1.30, z:-14.81, yaw:96°, pitch:-2°).
+  // See CLICK_ZOOM_SPOTS below for the click-to-zoom interactive itself.
+  'bookshelf-display': { x: 1.72, y: 1.3, z: -14.81, yawDeg: 96, pitchDeg: -2 },
 };
 
 // Real per-destination URLs - "i want diff places like portfolio pages to
@@ -498,6 +514,7 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
+  if (debugPosEl) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout
 
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
@@ -661,6 +678,81 @@ function flyToLocation(routeKey, fromRouteKey) {
     pathPoints: pathPoints.length > 2 ? pathPoints : null,
   };
 }
+
+// Click-to-zoom display spots - click specific scene geometry to fly the
+// camera in for a closer look, same flyToLocation() flight the Explore menu
+// stops use. Lands with a free camera (flyToLocation's flight always ends
+// with controls.locked = false, see updateTransition), so none of these need
+// a lock-in/exit-button state machine like the vinyl booth - walking away
+// again is just normal WASD.
+//
+// Two different targeting strategies per spot, picked per what's actually
+// practical for that geometry:
+//  - meshNames: works when the clickable thing is one (or a couple)
+//    consolidated meshes - the vinyl wall's ~30 records are baked into a
+//    single VinylWall_Cylinder.023 mesh (same crate-shelf convention used
+//    everywhere else in this scene), so 3 node names cover the whole
+//    display. Node names already glTF-sanitized (dots stripped, see
+//    world.js's sanitizeGltfName). Resolved lazily off `streetScene` (see
+//    world.js) on the first click attempt rather than every frame - same
+//    idea as titleScreen.js's bindSigns, just click-triggered instead of
+//    per-tick, since these lists never change once the street mesh has
+//    loaded.
+//  - meshNames: null ("proximity" mode) - "any of those shelf objects" for
+//    the bookshelf turned out to mean dozens of separate, individually
+//    auto-named meshes (Box2229_1.001, Box2338, Box2530, ...) with no shared
+//    parent group and no shared material to filter on either - there's no
+//    finite list worth hardcoding. Instead this raycasts against the WHOLE
+//    street scene and relies on the same range gate every spot already has:
+//    if you're standing close enough to the spot's own flyToLocation target
+//    for a hit to plausibly BE one of its books, that's good enough - it
+//    doesn't matter WHICH mesh you actually clicked.
+const CLICK_ZOOM_SPOTS = [
+  { routeKey: 'record-wall-display', range: 6, meshNames: ['VinylWall_Cylinder023', 'VinylShelf_Cube001', 'VinylShelf_Cube180'] },
+  { routeKey: 'bookshelf-display', range: 5, meshNames: null },
+];
+const clickZoomMeshCache = new Map(); // routeKey -> resolved meshes, only used by the meshNames strategy
+const clickZoomRaycaster = new THREE.Raycaster();
+const clickZoomPointer = new THREE.Vector2();
+
+function resolveClickZoomMeshes(spot) {
+  if (!spot.meshNames) return streetScene ? [streetScene] : null; // proximity mode - raycast everything
+  if (clickZoomMeshCache.has(spot.routeKey)) return clickZoomMeshCache.get(spot.routeKey);
+  if (!streetScene) return null;
+  const found = spot.meshNames.map((name) => streetScene.getObjectByName(name)).filter((obj) => obj && obj.isMesh);
+  if (found.length === 0) return null; // street may not have finished loading yet - try again next click
+  if (found.length < spot.meshNames.length) {
+    const missing = spot.meshNames.filter((name) => !streetScene.getObjectByName(name));
+    console.warn(`[click zoom: ${spot.routeKey}] some meshNames did not resolve to meshes:`, missing);
+  }
+  clickZoomMeshCache.set(spot.routeKey, found);
+  return found;
+}
+
+renderer.domElement.addEventListener('click', (e) => {
+  if (mode !== 'walk' || controls?.locked !== false || !streetScene) return; // not walking freely - mid-flight, vinyl-locked, or still on the title screen
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  clickZoomPointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  clickZoomPointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  clickZoomRaycaster.setFromCamera(clickZoomPointer, camera);
+
+  for (const spot of CLICK_ZOOM_SPOTS) {
+    const target = LOCATIONS[spot.routeKey];
+    const dist = camera.position.distanceTo(new THREE.Vector3(target.x, target.y, target.z));
+    if (dist > spot.range) continue; // too far away to "walk up and look" at this one - cheaper than raycasting first
+
+    const meshes = resolveClickZoomMeshes(spot);
+    if (!meshes || meshes.length === 0) continue;
+    // Recursive only in proximity mode (meshes === [streetScene], a whole
+    // subtree) - the named-mesh lists are already the exact leaf meshes.
+    const hits = clickZoomRaycaster.intersectObjects(meshes, !spot.meshNames);
+    if (hits.length === 0) continue;
+
+    flyToLocation(spot.routeKey);
+    return;
+  }
+});
 
 // Piecewise-linear position along pathPoints at eased-progress t (0-1),
 // parameterized by cumulative segment DISTANCE rather than point count - so
@@ -929,6 +1021,7 @@ function finishReturnToTitle() {
   socialLinksEl?.classList.remove('hidden');
   vinylExitBtn?.classList.add('hidden'); // defensive - vinylInteraction.dispose() above didn't fire onUnlocked
   dismissWelcomeBubble(); // in case you hit Home while it was still up
+  if (debugPosEl) debugPosEl.style.display = 'none';
 }
 
 // Corner nav overlay (PORTFOLIO / EXPLORE / CONTACT / ABOUT) - separate
@@ -1324,6 +1417,20 @@ const FOG_DRIFT_PERIOD = 38; // seconds per full cycle
 // but spends more of each cycle sitting close to true black.
 const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 
+// Debug position readout, back per your ask - for grabbing an exact spawn
+// point / reference coordinates while placing new interactives. See the
+// comment in index.html - delete the #debug-pos div (index.html + style.css)
+// and this block once you're done using it.
+function updatePositionDebug() {
+  if (!debugPosEl || !controls) return;
+  const p = controls.camera.position;
+  const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
+  const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);
+  let text = `x: ${p.x.toFixed(2)}\ny: ${p.y.toFixed(2)}\nz: ${p.z.toFixed(2)}\nyaw: ${yawDeg}°\npitch: ${pitchDeg}°`;
+  text += `\nstreet: ${streetSceneStatus.state} ${streetSceneStatus.detail}`;
+  debugPosEl.textContent = text;
+}
+
 function tick() {
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
@@ -1410,6 +1517,7 @@ function tick() {
       vinylDebugPosEl.textContent = `x ${p.x.toFixed(2)}\ny ${p.y.toFixed(2)}\nz ${p.z.toFixed(2)}`;
     }
     updateExploreNavVisibility(); // hides the </> arrows the moment you move away from an Explore spot
+    updatePositionDebug();
 
     post.tiltShiftPass.enabled = orthoActive;
     // Distance blur - walk mode's perspective camera only, and only once

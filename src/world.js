@@ -918,6 +918,29 @@ async function addStreetScene(scene) {
       }
     }
 
+    // "the huge street plane has the wrong map, id rather it just be dark
+    // grey" - Plane.002 (the ground-extension quad handled just above) is a
+    // single 4-vertex quad scaled up ~30x in every axis, so its baked
+    // texture (Material.005's baseColorTexture) stretches into unrecognizable
+    // dark blotches at that size - almost certainly also what read as
+    // "intersecting meshes" (the jagged dark shapes cutting across the
+    // sidewalk/crosswalk) rather than any actual overlapping geometry.
+    // Stripped the map and dropped in a flat dark grey instead, same idea as
+    // the standalone ground plane's 0x030303 from the original "black ground
+    // plane" pass, just lighter per "dark grey" this time.
+    const groundExtension = street.getObjectByName(sanitizeGltfName('Plane.002'));
+    if (groundExtension?.isMesh && groundExtension.material) {
+      const mats = Array.isArray(groundExtension.material) ? groundExtension.material : [groundExtension.material];
+      for (const mat of mats) {
+        if (!mat) continue;
+        mat.map = null;
+        mat.color.set(0x2a2a2a);
+        mat.needsUpdate = true;
+      }
+    } else {
+      console.warn('[ground extension] Plane.002 not found/no material - skipping grey-out');
+    }
+
     // "we have a missing sign mesh" - the blank panel next to the 3D
     // PRINTING sign turned out to be Object258 (confirmed by exact mesh
     // AND material name match - "Material_#12_1" - against a diagnostic

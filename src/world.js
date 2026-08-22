@@ -25,6 +25,27 @@ import { loadModel, loadingManager } from './loader.js';
 import { toUnlitFlat } from './shading.js';
 import { createAtmosphere } from './atmosphere.js';
 
+// "doesn't run on mobile / crashes or freezes the browser" - traced to raw
+// texture VRAM, not file size or geometry: TRY7_SCENE.glb alone decodes to
+// ~1GB of GPU memory (256 textures, several at 2048-3072px), plus another
+// ~100MB across the standalone models (RECORD_DISC.glb's 3 textures were
+// 2048px each for a small spinning disc - 48MB on their own). Desktop GPUs
+// shrug that off; mobile WebGL (especially iOS Safari) commonly caps out
+// around 256-512MB before the tab just dies. Built matching *_MOBILE.glb
+// variants (public/models/mobile/) with every texture capped at 512px -
+// cuts the same four files down to ~260MB combined, well inside a safe
+// mobile budget, with no visible quality loss at the scale a phone screen
+// actually renders this at. Same isMobile media-query controls.js already
+// uses for touch-vs-mouse input - duplicated here (not imported from
+// Controls) since this module needs it before any Controls instance
+// exists.
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+function modelPath(desktopPath, hasMobileVariant = true) {
+  if (!IS_MOBILE || !hasMobileVariant) return desktopPath;
+  const filename = desktopPath.split('/').pop().replace(/\.glb$/i, '_MOBILE.glb');
+  return `/models/mobile/${filename}`;
+}
+
 // Real mesh collision, replacing the crude radius/axis clamps in
 // controls.js (those stay in place as an outer safety-net backstop - see
 // the comment there). Octree is three.js's own spatial index for exactly
@@ -801,7 +822,7 @@ async function addStreetScene(scene) {
     // resolve under their exact names. The five per-room rebake overlays
     // stay DISABLED, same reasoning as always - see their old Promise.all
     // call site further down.
-    const { scene: street } = await loadModel('/models/TRY7_SCENE.glb');
+    const { scene: street } = await loadModel(modelPath('/models/TRY7_SCENE.glb'));
 
     // Baked/unlit by DEFAULT now - only LIT_EXCEPTION_MATERIAL_NAMES above
     // (just the record-store wall's normal map at this point - see the note
@@ -1092,7 +1113,7 @@ const TILES_LOADING_TOKEN = 'tiles-model-load';
 async function addTiles(scene) {
   loadingManager.itemStart(TILES_LOADING_TOKEN);
   try {
-    const { scene: tiles } = await loadModel('/models/TILES.glb');
+    const { scene: tiles } = await loadModel(modelPath('/models/TILES.glb'));
     tiles.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
@@ -1181,7 +1202,7 @@ const ME_LOADING_TOKEN = 'me-model-load';
 async function addMe(scene) {
   loadingManager.itemStart(ME_LOADING_TOKEN);
   try {
-    const { scene: me } = await loadModel('/models/ME.glb');
+    const { scene: me } = await loadModel(modelPath('/models/ME.glb'));
     me.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
@@ -1304,7 +1325,7 @@ const RECORD_DISC_LOADING_TOKEN = 'record-disc-model-load';
 async function addRecordDisc(scene) {
   loadingManager.itemStart(RECORD_DISC_LOADING_TOKEN);
   try {
-    const { scene: discScene } = await loadModel('/models/RECORD_DISC.glb');
+    const { scene: discScene } = await loadModel(modelPath('/models/RECORD_DISC.glb'));
     const disc = discScene.getObjectByName(sanitizeGltfName('Stickersbox02_Cube.005'));
     if (disc?.isMesh) {
       disc.visible = false;

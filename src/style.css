@@ -55,6 +55,28 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   color: #fff;
 }
 
+/* Small note pinned to the bottom of the loading screen - same Helvetica stack
+   as the percentage, just smaller and dimmed so it reads as secondary.
+   position:absolute takes it out of #loading-screen's flex column entirely, so
+   the logo + percentage stay optically centred as if it weren't there (in-flow
+   it would drag them upward). #loading-screen is position:fixed, so it's the
+   containing block for this. env(safe-area-inset-bottom) keeps it clear of the
+   home indicator on iPhones; the fallback 0px covers every other browser. */
+#loading-subline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0 16px;
+  text-align: center;
+}
+
 #intro-overlay {
   position: fixed;
   inset: 0;

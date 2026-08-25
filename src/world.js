@@ -111,9 +111,17 @@ function createSkyGradientTexture() {
   // flat background used to be, darkened a touch per "a bit darker", now
   // lightened slightly (3a3742 -> 4a4555) so it actually registers as
   // purple against the dark rather than reading as more black.
-  gradient.addColorStop(0, '#0e0c13');
-  gradient.addColorStop(0.35, '#4a4555');
-  gradient.addColorStop(1, '#4a4555');
+  // "i want this to fade to black not grey" - the fog was already pure black
+  // (see scene.fog below), so the grey haze the buildings dissolved into was
+  // never the fog, it was THIS backdrop showing through: the horizon stop sat
+  // at #4a4555, a light greyish-purple, so anything fogged out to nothing
+  // still landed on grey. Whole ramp is black now, top and horizon, which
+  // makes the backdrop agree with the black fog instead of fighting it.
+  // Keeping the gradient (rather than swapping in a flat Color) so the stops
+  // stay here as one obvious knob if you ever want the tint back.
+  gradient.addColorStop(0, '#000000');
+  gradient.addColorStop(0.35, '#000000');
+  gradient.addColorStop(1, '#000000');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 

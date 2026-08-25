@@ -72,7 +72,27 @@ export const gltfLoader = new GLTFLoader(manager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
 export const ktx2Loader = new KTX2Loader(manager);
-ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.169.0/examples/jsm/libs/basis/');
+// Self-hosted out of public/basis/ (copied from three's own
+// examples/jsm/libs/basis/) rather than fetched from unpkg mid-load. Two
+// reasons: it takes a third-party CDN off the critical path entirely (if
+// unpkg is slow or blocked, the whole scene load stalls behind it), and it
+// pins the transcoder to the exact three version in package.json instead of
+// a hardcoded version string here that can silently drift out of sync.
+ktx2Loader.setTranscoderPath('/basis/');
+
+// The transcode worker pool defaults to 4 (see three's WorkerPool), and each
+// worker spins up its OWN instance of the ~515KB Basis WASM transcoder plus
+// its own decode buffers. Four of those running at once is fine on desktop
+// but is a real transient memory spike on a phone - and it lands during the
+// initial scene load, exactly when memory is already at its highest. That
+// spike is the likely cause of iOS Safari discarding and reloading the tab
+// on first load, even though STEADY-state memory went down with KTX2.
+// One worker on mobile: textures transcode one at a time, so peak memory is
+// a single transcoder instead of four. Slightly slower to finish decoding,
+// but it's the peak that gets tabs killed, not the average.
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+ktx2Loader.setWorkerLimit(IS_MOBILE ? 1 : 4);
+
 gltfLoader.setKTX2Loader(ktx2Loader);
 
 // Needs a renderer instance to detect which compressed-texture formats the

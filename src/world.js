@@ -331,8 +331,11 @@ export function buildWorld(scene, renderer) {
   addBike(scene);
   addTiles(scene);
   addSigns(scene);
-  addAlbumCovers(scene);
-  addRecordDisc(scene);
+  // ALBUM_COVERS + RECORD_DISC are deliberately NOT loaded here. Both are
+  // only ever visible inside the vinyl booth, but loading them at startup
+  // put them on the shared LoadingManager, so every visitor waited on
+  // ~2.3MB of assets most of them never see. loadVinylBoothModels() below
+  // pulls them in on approach instead - see main.js's call site.
   // addBackgroundBuilding(scene) - RETIRED as of TRY6_SCENE.glb: the
   // 920_WEB_OPTIMIZED_FINALSAVE_fullscene.glb upload merged that same mesh
   // directly into the main scene (node tripo_node_...001, loaded as part of
@@ -347,7 +350,19 @@ export function buildWorld(scene, renderer) {
   // standalone file, it's a small function to write fresh rather than worth
   // having kept dead code around for.
 
-  return { updateAtmosphere: atmosphere.update };
+  return { updateAtmosphere: atmosphere.update, loadVinylBoothModels: () => loadVinylBoothModels(scene) };
+}
+
+// Vinyl booth models, pulled in on approach rather than at startup - see the
+// note where they used to be called in buildWorld. Idempotent: the flag means
+// repeated approach checks (this gets called from a per-frame proximity test)
+// only ever kick off one load.
+let vinylBoothModelsRequested = false;
+function loadVinylBoothModels(scene) {
+  if (vinylBoothModelsRequested) return;
+  vinylBoothModelsRequested = true;
+  addAlbumCovers(scene);
+  addRecordDisc(scene);
 }
 
 // Shrunk 100 -> 60 to help kill the fog/horizon seam above - still 2x

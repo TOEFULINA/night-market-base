@@ -123,7 +123,7 @@ initKtx2Loader(renderer);
 // so this isn't a loading-perf change, just repo cleanup.
 // buildWorld needs the renderer now (not just the scene) to generate that
 // environment map, which is why renderer construction moved above this call.
-const { updateAtmosphere } = buildWorld(scene, renderer);
+const { updateAtmosphere, loadVinylBoothModels } = buildWorld(scene, renderer);
 
 // --- Title screen / walk mode state machine ---------------------------
 // Starts in 'title': orthographic view of the signed corner building (see
@@ -153,6 +153,23 @@ vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
 const debugPosEl = document.getElementById('debug-pos'); // back per your ask, see index.html's comment on this element
 const touchControlsEl = document.getElementById('touch-controls'); // mobile joystick - see updateTouchControlsVisibility() below
+
+// Dev-only coordinate readout, off by default now - press D in walk mode to
+// toggle it. Desktop visitors were seeing the raw x/y/z/yaw/pitch dump and
+// the scene status line ("meshes:690 ... rebakes: disabled") in the corner.
+// Still exactly as useful to you for grabbing LOCATIONS coordinates, just
+// not on screen for everyone else. Never shown on mobile at all (see
+// updatePositionDebug's IS_MOBILE guard).
+let debugHudVisible = false;
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'd' && e.key !== 'D') return;
+  if (mode !== 'walk' || IS_MOBILE) return;
+  // Don't hijack the key while the player is typing somewhere.
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugHudVisible = !debugHudVisible;
+  if (debugPosEl) debugPosEl.style.display = debugHudVisible ? '' : 'none';
+});
 
 // Vinyl sample booth - "i want to be able to play songs and swap out the
 // cover. like a booth where u can sample." Filler content for now ("can
@@ -535,7 +552,11 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
-  if (debugPosEl && !IS_MOBILE) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout - dev-only tool, no reason to show visitors on mobile
+  // Debug readout stays hidden until you press D - it's a dev tool for
+  // picking camera coordinates, and visitors were seeing the x/y/z/yaw dump
+  // plus the "meshes:690 ... rebakes: disabled" status line in the corner on
+  // every desktop visit. See the keydown handler below.
+  if (debugPosEl) debugPosEl.style.display = debugHudVisible ? '' : 'none';
 
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
@@ -1236,6 +1257,24 @@ portfolioLightboxEl?.addEventListener('click', (e) => {
 // close button/Escape below AND defensively at the start of every other
 // flight (startTransition/flyToLocation/startReturnToTitle) so it can't
 // linger on screen while you fly somewhere else.
+// Contact overlay - flat panel, no 3D flight (see index.html's #contact-overlay
+// comment). Opened/closed straight from navigateToRoute below.
+const contactOverlayEl = document.getElementById('contact-overlay');
+const contactOverlayCloseBtn = document.getElementById('contact-overlay-close');
+
+function showContactOverlay() {
+  contactOverlayEl?.classList.remove('hidden');
+}
+function hideContactOverlay() {
+  contactOverlayEl?.classList.add('hidden');
+}
+contactOverlayCloseBtn?.addEventListener('click', () => {
+  hideContactOverlay();
+  // Back to whatever the URL said before, so the path doesn't stay on
+  // /contact after the panel's gone.
+  navigateToRoute(mode === 'walk' ? 'explore-archive-shop' : 'home');
+});
+
 const aboutOverlayEl = document.getElementById('about-overlay');
 const aboutOverlayScrollEl = document.getElementById('about-overlay-scroll');
 const aboutOverlayCloseBtn = document.getElementById('about-overlay-close');
@@ -1267,6 +1306,7 @@ window.addEventListener('keydown', (e) => {
   if (!portfolioLightboxEl.classList.contains('hidden')) closePortfolioLightbox();
   else if (!portfolioGalleryEl.classList.contains('hidden')) closePortfolioGallery();
   else if (!aboutOverlayEl?.classList.contains('hidden')) hideAboutOverlay();
+  else if (!contactOverlayEl?.classList.contains('hidden')) hideContactOverlay();
 });
 
 // Single dispatcher for "go to this route", used by menu clicks, browser
@@ -1291,6 +1331,9 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   if (!PORTFOLIO_CATEGORIES[route] && !portfolioGalleryEl.classList.contains('hidden')) {
     closePortfolioGallery();
   }
+  // Same idea for Contact - navigating anywhere else dismisses it, so it
+  // can't linger over a destination you've since flown to.
+  if (route !== 'contact') hideContactOverlay();
 
   if (pushHistory) {
     const path = pathForRoute(route);
@@ -1330,6 +1373,15 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   // the logo handler's own guard.
   if (PORTFOLIO_CATEGORIES[route]) {
     openPortfolioGallery(route);
+    if (mode === 'walk') collapseMainMenu();
+    return;
+  }
+
+  // Contact - same deal as the portfolio categories above: a flat overlay
+  // with no LOCATIONS entry, so it has to be handled before the
+  // "no destination wired yet" fallthrough below rather than after it.
+  if (route === 'contact') {
+    showContactOverlay();
     if (mode === 'walk') collapseMainMenu();
     return;
   }
@@ -1477,7 +1529,9 @@ const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 // comment in index.html - delete the #debug-pos div (index.html + style.css)
 // and this block once you're done using it.
 function updatePositionDebug() {
-  if (!debugPosEl || !controls || IS_MOBILE) return; // dev-only tool - stays hidden and skips the per-frame work on mobile
+  // dev-only tool - skips the per-frame string building entirely on mobile,
+  // and while it's toggled off on desktop (press D, see the keydown handler)
+  if (!debugPosEl || !controls || IS_MOBILE || !debugHudVisible) return;
   const p = controls.camera.position;
   const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
   const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);
@@ -1495,16 +1549,36 @@ function updatePositionDebug() {
 // free-walking: mode is 'walk', controls exist and aren't locked (covers
 // both the vinyl booth AND mid-flight in one check, since both set
 // controls.locked = true), and neither full-screen overlay is open.
+// "defer the vinyl models until someone is in approach mode" - ALBUM_COVERS
+// and RECORD_DISC used to load at startup and sat on the shared
+// LoadingManager, so every visitor waited on ~2.3MB of assets only ever seen
+// inside the vinyl booth. Now they start fetching once you get within
+// VINYL_PRELOAD_RANGE of the record spot, which is far enough out that
+// they've long since arrived by the time you're close enough to click in
+// (vinylInteraction's own INTERACT_RANGE is 4).
+// Deliberately generous rather than tight - the cost of loading slightly too
+// early is nothing, the cost of loading too late is a visible pop.
+const VINYL_PRELOAD_RANGE = 14;
+const vinylPreloadSpot = LOCATIONS['explore-records'];
+function maybeLoadVinylBoothModels() {
+  if (!loadVinylBoothModels || mode !== 'walk' || !vinylPreloadSpot) return;
+  const dx = camera.position.x - vinylPreloadSpot.x;
+  const dz = camera.position.z - vinylPreloadSpot.z;
+  if (dx * dx + dz * dz > VINYL_PRELOAD_RANGE * VINYL_PRELOAD_RANGE) return;
+  loadVinylBoothModels(); // no-ops after the first call, see world.js
+}
+
 function updateTouchControlsVisibility() {
   if (!IS_MOBILE || !touchControlsEl) return;
   const aboutHidden = !aboutOverlayEl || aboutOverlayEl.classList.contains('hidden');
   const portfolioHidden = !portfolioGalleryEl || portfolioGalleryEl.classList.contains('hidden');
+  const contactHidden = !contactOverlayEl || contactOverlayEl.classList.contains('hidden');
   // "still there on main menu" - this was the walk-mode dropdown menu (tap to
   // open a list of destinations), not the title screen - mode is still 'walk'
   // while that menu is open, so the old check missed it. mainMenuListEl only
   // has 'collapsed' removed while the dropdown is expanded.
   const menuClosed = !mainMenuListEl || mainMenuListEl.classList.contains('collapsed');
-  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden && menuClosed;
+  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden && contactHidden && menuClosed;
   touchControlsEl.classList.toggle('hidden', !show);
 }
 
@@ -1556,6 +1630,7 @@ function tick() {
   // hidden there instead of showing by default until the first walk-mode
   // frame ever runs.
   updateTouchControlsVisibility();
+  maybeLoadVinylBoothModels();
 
   // Orbs/smoke/stars - moved out of the walk-only branch so the stars
   // actually twinkle on the title screen too (that's specifically what got

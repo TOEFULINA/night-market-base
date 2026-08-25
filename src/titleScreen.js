@@ -34,6 +34,31 @@
 
 import * as THREE from 'three';
 
+// Per-sign clicking is OFF.
+//
+// "i dont know that i need any signs clickable on main menu? just emissive.
+// that was an old need pre menu" - correct, and it had already stopped doing
+// anything: main.js's onEnter handler calls startTransition() regardless of
+// which sign was hit, and does the same for a background miss. So the whole
+// raycast path was resolving a name, logging it, and then taking the exact
+// same branch either way.
+//
+// What turning it off actually saves:
+//   - a raycast against 17 meshes on every single pointermove
+//   - 17 material clones at load (bindSigns had to clone so hover tinting
+//     couldn't leak into other objects sharing those materials)
+//   - and, the real prize: those 17 panels no longer need to survive as
+//     separately-named objects, so they can be joined with everything else
+//     when condensing the scene in Blender.
+//
+// Clicking anywhere on the title screen still enters walk mode - that's
+// _onClick's onEnter(null) path, which is what every sign click was
+// effectively doing anyway.
+//
+// Flip to true to bring hover/click targeting back; the code below is intact,
+// just gated.
+const SIGN_CLICKS_ENABLED = false;
+
 export const MENU_SIGN_NODE_NAMES = [
   // top of the building - biggest/most prominent panels
   'Box011_2', 'Object1405101166',
@@ -286,6 +311,10 @@ export class TitleScreen {
   bindSigns(street) {
     if (this._boundOnce) return;
     this._boundOnce = true;
+    // Nothing to resolve or clone when sign targeting is off - see
+    // SIGN_CLICKS_ENABLED at the top of this file. Leaving signMeshes empty
+    // also makes _raycastSign() a cheap early return.
+    if (!SIGN_CLICKS_ENABLED) return;
 
     this.signMeshes = MENU_SIGN_NODE_NAMES
       .map((name) => street.getObjectByName(name))
@@ -327,6 +356,9 @@ export class TitleScreen {
 
   _onPointerMove(e) {
     this._setPointerFromEvent(e);
+    // Pointer position itself still matters - update() reads it for the
+    // parallax - but with targeting off there's nothing to raycast against.
+    if (!SIGN_CLICKS_ENABLED) return;
     const hit = this._raycastSign();
     if (hit === this.hovered) return;
 

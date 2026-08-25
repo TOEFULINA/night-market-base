@@ -11,13 +11,20 @@ const canvas = document.getElementById('scene');
 
 const scene = new THREE.Scene();
 
+// Declared up here (not down by the renderer where the rest of the mobile
+// gating lives) since the camera's FOV needs it too, and the camera is
+// constructed first.
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+// Vertical FOV. Went 70 -> 55 -> 45 on desktop. "camera FOV on phone should
+// be bigger" - 45 was tuned for a mouse-controlled desktop view; held a foot
+// or so from your face, a phone screen makes the same FOV read as more
+// zoomed-in/claustrophobic than the equivalent desktop framing, especially
+// in the narrower shop aisles. Wider on mobile only - desktop's 45 is
+// unchanged.
+const CAMERA_FOV = IS_MOBILE ? 62 : 45;
+
 const camera = new THREE.PerspectiveCamera(
-  // Vertical FOV. Went 70 -> 55 -> 45. Lower FOV = more "zoomed in" /
-  // telephoto - narrower peripheral view, but things read closer and larger
-  // and straight lines stop bowing near the edges. 45 is on the tighter end
-  // for a walking game (some claustrophobia risk in narrow alleys - if it
-  // ever feels too tunnel-vision-y, that's the tradeoff to dial back).
-  45,
+  CAMERA_FOV,
   window.innerWidth / window.innerHeight,
   0.1,
   // TEMP: bumped from 120 to cover the street scene's raw extent. This is a
@@ -44,8 +51,8 @@ camera.layers.enable(1);
 // memory, completely separate from texture VRAM, and none of them were
 // scaled down for mobile before now - antialias MSAA buffers, the full
 // EffectComposer ping-pong pair, and a 2048x2048 shadow map, all sized off
-// devicePixelRatio. Cutting all three for mobile specifically.
-const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+// devicePixelRatio. Cutting all three for mobile specifically. (IS_MOBILE
+// itself is declared up by the camera now, not here - see its comment.)
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, powerPreference: 'high-performance' });
 // cap pixel ratio - rendering at full 3x retina resolution on a phone is a
 // straightforward, easy-to-miss way to tank frame rate for no visible gain.

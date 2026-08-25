@@ -956,6 +956,39 @@ async function addStreetScene(scene) {
       console.warn('[ground extension] Plane.002 not found/no material - skipping grey-out');
     }
 
+    // "the building grey is way too light, i think the fog is only black at a
+    // distance" - right on both counts. Fog is linear between near=7 and
+    // far=32, so a surface sitting ~12-18 units out only picks up a fraction
+    // of it; the big background buildings are close enough (and tall enough)
+    // that most of their face reads at near-full material brightness. The fog
+    // isn't the thing to change - pulling it in far enough to darken these
+    // would also swallow the storefronts you actually want visible.
+    // Darkening the buildings' own base colour instead: multiplyScalar keeps
+    // whatever texture/shading detail is already baked in and just scales it
+    // down, unlike .set() which would flatten them to a solid block. 0.35 is
+    // the knob - lower is darker.
+    const BG_BUILDING_NODE_NAMES = [
+      'tripo_node_1b17d649-d3ad-4287-9088-27fc9b46c0de',
+      'tripo_node_4bae5984-e7fd-4e13-b2cc-a0c2456c2ee1.001',
+    ];
+    const BG_BUILDING_DARKEN = 0.35;
+    for (const rawName of BG_BUILDING_NODE_NAMES) {
+      const node = street.getObjectByName(sanitizeGltfName(rawName));
+      if (!node) {
+        console.warn(`[bg building darken] ${rawName} not found - skipping`);
+        continue;
+      }
+      node.traverse((obj) => {
+        if (!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (!mat?.color) continue;
+          mat.color.multiplyScalar(BG_BUILDING_DARKEN);
+          mat.needsUpdate = true;
+        }
+      });
+    }
+
     // "we have a missing sign mesh" - the blank panel next to the 3D
     // PRINTING sign turned out to be Object258 (confirmed by exact mesh
     // AND material name match - "Material_#12_1" - against a diagnostic

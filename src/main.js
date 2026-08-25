@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Controls } from './controls.js';
 import { buildWorld, streetSceneStatus, streetScene, albumCoverPlanes, recordDiscRef } from './world.js';
-import { initLoadingUI } from './loader.js';
+import { initLoadingUI, initKtx2Loader } from './loader.js';
 import { TitleScreen } from './titleScreen.js';
 import { createPostProcessing, grainUniforms } from './postprocessing.js';
 import { flickerUniforms } from './shading.js';
@@ -102,6 +102,15 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 // Nudged down a touch (1.0 -> 0.92) per "just a bit darker" - small enough
 // not to fight the contrast-pass reasoning above, just a slight overall dim.
 renderer.toneMappingExposure = 0.92;
+
+// KTX2/Basis textures need the GPU probed once up front so the transcoder
+// knows which compressed format to decode into (BC7/ASTC/ETC - varies by
+// device). loader.js has always exported this, but nothing ever called it,
+// which means any .ktx2-textured glb would have failed to load. Harmless
+// while every model is still plain JPEG/PNG - KTX2Loader only engages for
+// images that are actually .ktx2 - so it's safe to wire up ahead of the
+// encoded files existing.
+initKtx2Loader(renderer);
 
 // Companion character, background NPCs, the toon/flat shading pipeline, and
 // the black-outline post-process are all gone per your call to drop the

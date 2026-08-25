@@ -1140,32 +1140,6 @@ function shuffled(array) {
   return result;
 }
 
-// Grid thumbnails vs full-size originals.
-//
-// The grid used to point every tile at the full-resolution original - up to
-// ~3.8MB each, ~50 per category. File size isn't even the main cost: the
-// browser decodes each one to raw RGBA to display it, so a 2000px image holds
-// ~16MB of memory regardless of how well the file compressed. Fifty of those
-// is what pushed the tab into Safari's "reloaded because it was using
-// significant memory" territory on DESKTOP, not just mobile.
-//
-// public/portfolio-mobile/ already holds a ~700px copy of every asset (built
-// for the mobile manifest), and 700px is far more than a 320px-wide grid tile
-// needs - so the grid reads from there on every device now, and only the
-// LIGHTBOX loads the original. You still get full quality when you actually
-// open something; you just stop paying for 50 of them at once.
-//
-// Idempotent on purpose: mobile's manifest already points at portfolio-mobile,
-// so this has to no-op there rather than mangling the path a second time.
-function thumbPath(path) {
-  if (path.startsWith('/portfolio-mobile/')) return path;
-  if (!path.startsWith('/portfolio/')) return path;
-  const moved = path.replace('/portfolio/', '/portfolio-mobile/');
-  // build_mobile_portfolio.py re-encodes every still as .jpg; clips keep
-  // their original .mp4 name.
-  return isVideoPath(moved) ? moved : moved.replace(/\.[^./]+$/, '.jpg');
-}
-
 async function openPortfolioGallery(route) {
   const category = PORTFOLIO_CATEGORIES[route];
   if (!category) return;
@@ -1186,7 +1160,7 @@ async function openPortfolioGallery(route) {
     if (isVideoPath(path)) {
       tile.classList.add('is-video');
       const video = document.createElement('video');
-      video.src = thumbPath(path);
+      video.src = path;
       // mobile: don't even preload metadata for every clip the instant the
       // gallery opens - 'none' means nothing fetches until the tile is
       // actually tapped. Desktop keeps 'metadata' as before.
@@ -1196,17 +1170,10 @@ async function openPortfolioGallery(route) {
       tile.appendChild(video);
     } else {
       const img = document.createElement('img');
-      img.src = thumbPath(path);
+      img.src = path;
       img.loading = 'lazy';
-      // Tells the browser the tile's real rendered width up front, so it can
-      // pick a cheaper decode size instead of decoding at full resolution and
-      // scaling down afterwards.
-      img.sizes = '320px';
-      img.decoding = 'async';
       tile.appendChild(img);
     }
-    // Lightbox gets the ORIGINAL, not the thumbnail - full quality is the
-    // whole point of opening one, and it's a single image rather than fifty.
     tile.addEventListener('click', () => openPortfolioLightbox(path));
     portfolioGalleryGridEl.appendChild(tile);
   }

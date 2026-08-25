@@ -119,16 +119,7 @@ export function initLoadingUI(onComplete) {
     if (percent) percent.textContent = `${pct}%`;
   };
 
-  // Fires ONCE, on the initial batch only. Anything lazy-loaded later (the
-  // vinyl booth models on approach, see world.js's loadVinylBoothModels)
-  // still goes through this same shared manager, because gltfLoader was
-  // constructed with it - so without this guard, finishing a late load would
-  // re-run onComplete and re-trigger the whole initial-route handling, and
-  // re-hide an already-hidden loading screen.
-  let loadedOnce = false;
   manager.onLoad = () => {
-    if (loadedOnce) return;
-    loadedOnce = true;
     screen?.classList.add('hidden');
     onComplete?.();
   };

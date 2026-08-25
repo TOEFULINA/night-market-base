@@ -259,6 +259,51 @@ body.about-open #main-menu {
   align-items: center;
   gap: 32px;
 }
+/* "when u go to a submenu the logo moves, theyre spaced weird, etc."
+   Both symptoms are the same root cause: .submenu expands IN FLOW inside its
+   <li>, so opening it makes that <li> (and the whole row) taller. The outer
+   row is align-items:center, so a taller row re-centres everything - which is
+   exactly the logo jumping. It also pushed the open list down over the grid,
+   and since .submenu has no background of its own, the items rendered
+   straight on top of the artwork with nothing behind them.
+   Taking the submenu OUT of flow fixes all of it at once: the row's height
+   stops depending on submenu state (logo never moves), and it floats above
+   the gallery instead of displacing it. Scoped to the portfolio/about pages
+   only - the title screen and walk-mode dropdown still stack in flow, which
+   is what they want. */
+body.portfolio-open #main-menu-list li.has-submenu,
+body.about-open #main-menu-list li.has-submenu {
+  position: relative;
+}
+body.portfolio-open .has-submenu .submenu,
+body.about-open .has-submenu .submenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0;
+  padding: 0;
+  min-width: max-content;
+  gap: 0;
+}
+/* Panel look, so the items read against a surface instead of the artwork
+   underneath. Padding/background only appear once it's open - applying them
+   to the closed state would leave a visible white chip sitting under the
+   label at max-height:0. */
+body.portfolio-open .has-submenu:hover .submenu,
+body.about-open .has-submenu:hover .submenu {
+  margin-top: 6px;
+  padding: 10px 14px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+}
+body.portfolio-open .has-submenu .submenu li,
+body.about-open .has-submenu .submenu li {
+  font-size: 14px;
+  line-height: 1.2;
+  padding: 5px 0;
+  white-space: nowrap;
+}
+
 body.portfolio-open #main-menu-list,
 body.about-open #main-menu-list {
   flex-direction: row;
@@ -649,21 +694,29 @@ body.about-open #main-menu-list {
   left: 0;
   right: 0;
   bottom: 0;
-  overflow: auto;
+  /* Vertical only now that the grid is no longer wider than the screen -
+     see #portfolio-gallery-grid's width below. Explicitly hiding overflow-x
+     rather than leaving it 'auto' so a stray wide tile can't quietly
+     reintroduce the sideways scroll this was meant to remove. */
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0 40px 60px;
 }
 
 #portfolio-gallery-grid {
-  /* Fixed wide canvas instead of viewport-relative column-count - "wider
-     than the screen" is the actual ask, not "as many columns as fit,"
-     so this no longer shrinks/grows with window width at all. 2800px
-     comfortably needs horizontal scroll on most monitors.
-     column-width (not column-count) per "pics should still be small" -
-     this pins each tile to a small fixed width and lets the browser fit
-     as many columns as the 2800px canvas allows, instead of stretching
-     a fixed column count to fill the space. */
-  width: 2800px;
-  column-width: 200px;
+  /* "instead of a multi way scroll lets just bring back up and down scroll"
+     - this used to be a fixed 2800px-wide canvas, deliberately wider than the
+     viewport so the gallery scrolled sideways as well as down. Back to 100%,
+     so the canvas is exactly as wide as the screen and the only scroll axis
+     left is vertical. column-width stays 200px, so tiles keep the same small
+     size and the browser just fits however many columns the window allows -
+     the layout reflows with the window instead of overflowing it. */
+  width: 100%;
+  /* "make all of the images a little bigger so less fit per row, its too
+     cluttered" - 200px -> 320px. column-width is a MINIMUM the browser
+     rounds up to fill the row, so raising it drops the column count and
+     each tile gets correspondingly wider. */
+  column-width: 320px;
   /* Tighter gap per "the border between the portfolio images to be
      smaller" - 14px -> 4px, matched on the tile's own margin-bottom below
      so the horizontal (column-gap) and vertical (stacking) spacing stay
@@ -676,7 +729,12 @@ body.about-open #main-menu-list {
   break-inside: avoid;
   margin-bottom: 4px;
   overflow: hidden;
-  background: #f0f0f0;
+  /* "dont give the pngs a grey base too" - this was #f0f0f0, a placeholder
+     tint that showed while a tile's image was still loading. Harmless for
+     opaque JPEGs, but transparent PNGs let it show through permanently, so
+     every cut-out asset sat on a grey block instead of the white page.
+     Transparent lets the gallery's own white show through in both cases. */
+  background: transparent;
   cursor: pointer;
   line-height: 0; /* kills the inline-image baseline gap under each tile */
 }
@@ -718,10 +776,28 @@ body.about-open #main-menu-list {
   padding: 60px;
 }
 #portfolio-lightbox.hidden { display: none; }
-#portfolio-lightbox-content img,
-#portfolio-lightbox-content video {
+/* "make when you click, the preview opens to screen size instead of this big"
+   - the old rule was max-height:100%, but a percentage height only resolves
+   against a parent that HAS a definite height. #portfolio-lightbox-content is
+   a plain auto-height div, so 100% was indeterminate, the browser ignored the
+   cap, and the image rendered at its natural pixel size - overflowing off the
+   bottom of the screen. Sizing against the viewport directly (vh/vw minus the
+   60px padding on each side) sidesteps the parent-height chain completely, so
+   it always fits the screen no matter the image's dimensions. */
+#portfolio-lightbox-content {
   max-width: 100%;
   max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#portfolio-lightbox-content img,
+#portfolio-lightbox-content video {
+  max-width: calc(100vw - 120px);
+  max-height: calc(100vh - 120px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
   display: block;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }

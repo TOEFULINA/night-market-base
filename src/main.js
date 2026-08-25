@@ -344,11 +344,6 @@ const LOCATIONS = {
   // interactive below (RECORD_WALL_NODE_NAMES) - not in EXPLORE_ROUTE_ORDER,
   // so activateExploreNavIfApplicable's </> arrows correctly stay hidden here.
   'record-wall-display': { x: -6.93, y: 1.3, z: -13.57, yawDeg: 270 },
-  // Bookshelf close-up - "i also wanna run a camera snap to here for any of
-  // those shelf objects" - debug-HUD coordinates off your screenshot
-  // standing in front of it (x:1.72, y:1.30, z:-14.81, yaw:96°, pitch:-2°).
-  // See CLICK_ZOOM_SPOTS below for the click-to-zoom interactive itself.
-  'bookshelf-display': { x: 1.72, y: 1.3, z: -14.81, yawDeg: 96, pitchDeg: -2 },
 };
 
 // Real per-destination URLs - "i want diff places like portfolio pages to
@@ -686,30 +681,21 @@ function flyToLocation(routeKey, fromRouteKey) {
 // a lock-in/exit-button state machine like the vinyl booth - walking away
 // again is just normal WASD.
 //
-// Two different targeting strategies per spot, picked per what's actually
-// practical for that geometry:
-//  - meshNames: works when the clickable thing is one (or a couple)
-//    consolidated meshes - the vinyl wall's ~30 records are baked into a
-//    single VinylWall_Cylinder.023 mesh (same crate-shelf convention used
-//    everywhere else in this scene), so 3 node names cover the whole
-//    display. Node names already glTF-sanitized (dots stripped, see
-//    world.js's sanitizeGltfName). Resolved lazily off `streetScene` (see
-//    world.js) on the first click attempt rather than every frame - same
-//    idea as titleScreen.js's bindSigns, just click-triggered instead of
-//    per-tick, since these lists never change once the street mesh has
-//    loaded.
-//  - meshNames: null ("proximity" mode) - "any of those shelf objects" for
-//    the bookshelf turned out to mean dozens of separate, individually
-//    auto-named meshes (Box2229_1.001, Box2338, Box2530, ...) with no shared
-//    parent group and no shared material to filter on either - there's no
-//    finite list worth hardcoding. Instead this raycasts against the WHOLE
-//    street scene and relies on the same range gate every spot already has:
-//    if you're standing close enough to the spot's own flyToLocation target
-//    for a hit to plausibly BE one of its books, that's good enough - it
-//    doesn't matter WHICH mesh you actually clicked.
+// meshNames works when the clickable thing is one (or a couple) consolidated
+// meshes - the vinyl wall's ~30 records are baked into a single
+// VinylWall_Cylinder.023 mesh (same crate-shelf convention used everywhere
+// else in this scene), so 3 node names cover the whole display. Node names
+// already glTF-sanitized (dots stripped, see world.js's sanitizeGltfName).
+// Resolved lazily off `streetScene` (see world.js) on the first click attempt
+// rather than every frame - same idea as titleScreen.js's bindSigns, just
+// click-triggered instead of per-tick, since this list never changes once
+// the street mesh has loaded. (A `meshNames: null` "proximity" mode - raycast
+// the whole scene, gate on distance alone - also went through this system
+// briefly for a shelf whose books turned out to be dozens of separately
+// auto-named meshes with nothing to group them by; removed per your ask, but
+// resolveClickZoomMeshes below still supports it if that ever comes back.)
 const CLICK_ZOOM_SPOTS = [
   { routeKey: 'record-wall-display', range: 6, meshNames: ['VinylWall_Cylinder023', 'VinylShelf_Cube001', 'VinylShelf_Cube180'] },
-  { routeKey: 'bookshelf-display', range: 5, meshNames: null },
 ];
 const clickZoomMeshCache = new Map(); // routeKey -> resolved meshes, only used by the meshNames strategy
 const clickZoomRaycaster = new THREE.Raycaster();

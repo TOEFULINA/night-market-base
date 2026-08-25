@@ -223,6 +223,34 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
     opacity: 1;
     margin-top: 6px;
   }
+
+  /* ---- Portfolio grid on touch -------------------------------------------
+     "i want the collages in portfolio to be on mobile instead of a one at a
+     time scroll". The grid is a CSS multi-column masonry whose column count
+     the browser derives from column-width vs available width. Desktop's
+     320px column can't fit twice on a ~390px phone once 40px of padding sits
+     on each side, so it always collapsed to exactly one column - a single
+     tall stack, one image at a time.
+     Narrower columns + tighter padding gets 2 up on a normal phone and 3 on
+     a large one or in landscape, so it reads as a collage again. */
+  #portfolio-gallery-scroll {
+    padding: 0 12px 40px;
+  }
+  #portfolio-gallery-grid {
+    column-width: 150px;
+    column-gap: 4px;
+  }
+
+  /* The lightbox reserved 60px of padding on every side for a desktop
+     window; on a phone that's most of the screen. Much smaller inset so a
+     tapped image actually fills the display. */
+  #portfolio-lightbox { padding: 16px; }
+  #portfolio-lightbox-content img,
+  #portfolio-lightbox-content video {
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+  }
+  #portfolio-lightbox-close { top: 16px; right: 18px; }
 }
 
 #touch-controls {

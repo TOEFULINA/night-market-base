@@ -1064,7 +1064,14 @@ const portfolioLightboxCloseBtn = document.getElementById('portfolio-lightbox-cl
 let portfolioManifestPromise = null;
 function getPortfolioManifest() {
   if (!portfolioManifestPromise) {
-    portfolioManifestPromise = fetch('/portfolio/manifest.json').then((r) => r.json());
+    // "reduce load times between portfolio and across everything on mobile" -
+    // manifest-mobile.json points at public/portfolio-mobile/, a
+    // pre-shrunk copy (images capped ~700px/JPEG q68, dynamics clips
+    // downscaled+recompressed) built by build_mobile_portfolio.py.
+    // 96MB of images -> 8MB, 17MB of dynamics video -> 2.6MB. Desktop keeps
+    // fetching the original full-res manifest, untouched.
+    const manifestPath = IS_MOBILE ? '/portfolio/manifest-mobile.json' : '/portfolio/manifest.json';
+    portfolioManifestPromise = fetch(manifestPath).then((r) => r.json());
   }
   return portfolioManifestPromise;
 }
@@ -1136,7 +1143,10 @@ async function openPortfolioGallery(route) {
       tile.classList.add('is-video');
       const video = document.createElement('video');
       video.src = path;
-      video.preload = 'metadata';
+      // mobile: don't even preload metadata for every clip the instant the
+      // gallery opens - 'none' means nothing fetches until the tile is
+      // actually tapped. Desktop keeps 'metadata' as before.
+      video.preload = IS_MOBILE ? 'none' : 'metadata';
       video.muted = true;
       video.playsInline = true;
       tile.appendChild(video);
@@ -1438,7 +1448,12 @@ function updateTouchControlsVisibility() {
   if (!IS_MOBILE || !touchControlsEl) return;
   const aboutHidden = !aboutOverlayEl || aboutOverlayEl.classList.contains('hidden');
   const portfolioHidden = !portfolioGalleryEl || portfolioGalleryEl.classList.contains('hidden');
-  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden;
+  // "still there on main menu" - this was the walk-mode dropdown menu (tap to
+  // open a list of destinations), not the title screen - mode is still 'walk'
+  // while that menu is open, so the old check missed it. mainMenuListEl only
+  // has 'collapsed' removed while the dropdown is expanded.
+  const menuClosed = !mainMenuListEl || mainMenuListEl.classList.contains('collapsed');
+  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden && menuClosed;
   touchControlsEl.classList.toggle('hidden', !show);
 }
 

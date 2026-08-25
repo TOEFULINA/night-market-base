@@ -77,6 +77,15 @@ const CAMERA_HEIGHT_OFFSET = 6; // lift above building center so it reads slight
 // no real pan needed), so scaled the margin down by the same ~1.11x:
 // 1.3 -> 1.17.
 const FRUSTUM_MARGIN = 1.17;
+// "zoom out on the home screen on mobile only, so more of the whole model is
+// visible" - same margin knob as above (bigger margin = taller/wider
+// orthographic frustum = more of the building fits on screen), just a
+// separate, larger value for mobile. Desktop's 1.17 is untouched.
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+const FRUSTUM_MARGIN_MOBILE = 1.6;
+function currentFrustumMargin() {
+  return IS_MOBILE ? FRUSTUM_MARGIN_MOBILE : FRUSTUM_MARGIN;
+}
 // Shifts what the camera is CENTERED ON upward, separate from
 // CAMERA_HEIGHT_OFFSET above (that only tilts the viewing angle - lookAt()
 // keeps the target point screen-centered no matter how high the camera
@@ -135,7 +144,7 @@ function buildingCenter() {
 function createOrthoCamera(renderer) {
   const size = renderer.getSize(new THREE.Vector2());
   const aspect = size.x / size.y;
-  const height = (BUILDING_BOUNDS.max.y - BUILDING_BOUNDS.min.y) * FRUSTUM_MARGIN;
+  const height = (BUILDING_BOUNDS.max.y - BUILDING_BOUNDS.min.y) * currentFrustumMargin();
   const width = height * aspect;
 
   const camera = new THREE.OrthographicCamera(-width / 2, width / 2, height / 2, -height / 2, 0.1, 300);
@@ -328,7 +337,7 @@ export class TitleScreen {
   onResize() {
     const size = this.renderer.getSize(new THREE.Vector2());
     const aspect = size.x / size.y;
-    const height = (BUILDING_BOUNDS.max.y - BUILDING_BOUNDS.min.y) * FRUSTUM_MARGIN;
+    const height = (BUILDING_BOUNDS.max.y - BUILDING_BOUNDS.min.y) * currentFrustumMargin();
     const width = height * aspect;
     this.camera.left = -width / 2;
     this.camera.right = width / 2;

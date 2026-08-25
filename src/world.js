@@ -207,7 +207,14 @@ export function buildWorld(scene, renderer) {
   // visible behind the buildings anyway - this is a cheap backdrop, not a
   // real sky dome. Horizon color kept at the same ~0x403d48 greyish-purple,
   // darkened a touch (per "a bit darker") rather than picked fresh.
-  scene.background = createSkyGradientTexture();
+  // "get rid of my newest additions like side buildings and make it pure
+  // black on mobile" - Plane.002 (street plane) and the two big tripo_node
+  // buildings (see the mesh-strip on the mobile GLB itself, further below -
+  // this isn't just a visibility toggle, their mesh/material/texture data
+  // never gets decoded on mobile at all now) are gone on mobile, which would
+  // leave a gap where they used to fill the frame - flat black instead of
+  // the gradient backdrop covers that gap and matches "pure black" directly.
+  scene.background = IS_MOBILE ? new THREE.Color(0x000000) : createSkyGradientTexture();
 
   // Environment map for realistic PBR reflections - without this,
   // MeshStandardMaterial/MeshPhysicalMaterial surfaces have nothing to

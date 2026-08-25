@@ -141,6 +141,13 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   z-index: 5;
   pointer-events: none;
 }
+/* ID beats the .mobile-only media-query rule's specificity, so this still
+   wins even though .mobile-only sets display:block unconditionally on any
+   touch device - see main.js's updateTouchControlsVisibility(). "dont show
+   the walkaround button unless im in an explore page" - the joystick was
+   showing on mobile the whole time (title screen, vinyl booth locked in,
+   About/Portfolio overlays), not just while actually free-walking. */
+#touch-controls.hidden { display: none; }
 #joystick-zone {
   position: absolute;
   left: 28px;

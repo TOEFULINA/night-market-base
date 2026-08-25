@@ -134,6 +134,7 @@ const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
 const debugPosEl = document.getElementById('debug-pos'); // back per your ask, see index.html's comment on this element
+const touchControlsEl = document.getElementById('touch-controls'); // mobile joystick - see updateTouchControlsVisibility() below
 
 // Vinyl sample booth - "i want to be able to play songs and swap out the
 // cover. like a booth where u can sample." Filler content for now ("can
@@ -1424,6 +1425,23 @@ function updatePositionDebug() {
   debugPosEl.textContent = text;
 }
 
+// "dont show the walkaround button UNLESS im in an explore page" - the
+// joystick (#touch-controls, wired up in controls.js's _setupTouch) was
+// showing on mobile in every state - title screen, locked into the vinyl
+// booth, mid-flight, even with the About/Portfolio overlays covering the
+// whole screen - since .mobile-only's CSS media query shows it unconditionally
+// and nothing in JS ever toggled it. "Explore page" here means genuinely
+// free-walking: mode is 'walk', controls exist and aren't locked (covers
+// both the vinyl booth AND mid-flight in one check, since both set
+// controls.locked = true), and neither full-screen overlay is open.
+function updateTouchControlsVisibility() {
+  if (!IS_MOBILE || !touchControlsEl) return;
+  const aboutHidden = !aboutOverlayEl || aboutOverlayEl.classList.contains('hidden');
+  const portfolioHidden = !portfolioGalleryEl || portfolioGalleryEl.classList.contains('hidden');
+  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden;
+  touchControlsEl.classList.toggle('hidden', !show);
+}
+
 function tick() {
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
@@ -1466,6 +1484,12 @@ function tick() {
     vinylInteraction.bindDisc(recordDiscRef.mesh);
     recordDiscBound = true;
   }
+
+  // Unconditional (not nested in the mode === 'walk' branch below) - needs
+  // to run on the title screen too, so the joystick starts out correctly
+  // hidden there instead of showing by default until the first walk-mode
+  // frame ever runs.
+  updateTouchControlsVisibility();
 
   // Orbs/smoke/stars - moved out of the walk-only branch so the stars
   // actually twinkle on the title screen too (that's specifically what got

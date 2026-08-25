@@ -111,6 +111,24 @@ const FRAME_CENTER_Y_OFFSET = 1.2;
 // 2 -> 0.5 to pan back left and give it more presence again, without
 // undoing the original right-edge crop fix entirely.
 const FRAME_CENTER_X_OFFSET = 0.5;
+// "move the whole model a tiny bit right and down on mobile, the menu is
+// overlaying billboards again" - mobile-only nudge on top of the desktop
+// offsets above. Moving the FRAME left makes the model appear to shift
+// right on screen (and vice versa - positive X offset pans the frame
+// right, which pushes the model left, per the comment above), so a
+// rightward model shift means a NEGATIVE delta here. Same inverse logic
+// for Y: increasing FRAME_CENTER_Y_OFFSET pans the frame/look-target up,
+// which pushes the model DOWN on screen (that's literally what pulled
+// "DESIGN" down into frame instead of clipping it) - so a downward model
+// shift means a POSITIVE delta. Desktop's own X/Y offsets above are
+// untouched.
+const FRAME_CENTER_X_OFFSET_MOBILE = FRAME_CENTER_X_OFFSET - 3.6;
+const FRAME_CENTER_Y_OFFSET_MOBILE = FRAME_CENTER_Y_OFFSET + 3.6;
+function currentFrameCenterOffsets() {
+  return IS_MOBILE
+    ? { x: FRAME_CENTER_X_OFFSET_MOBILE, y: FRAME_CENTER_Y_OFFSET_MOBILE }
+    : { x: FRAME_CENTER_X_OFFSET, y: FRAME_CENTER_Y_OFFSET };
+}
 // Which diagonal corner to view from - flipped from the first guess (+1,+1)
 // after you reported seeing a plain windowed back wall instead of the
 // signed face. -1,-1 looks from the opposite corner instead. If this is
@@ -151,7 +169,8 @@ function createOrthoCamera(renderer) {
 
   const center = buildingCenter();
   const frameTarget = center.clone();
-  frameTarget.y += FRAME_CENTER_Y_OFFSET;
+  const frameOffsets = currentFrameCenterOffsets();
+  frameTarget.y += frameOffsets.y;
   const cameraPos = new THREE.Vector3(
     frameTarget.x + CAMERA_CORNER.x * CAMERA_DISTANCE,
     frameTarget.y + CAMERA_HEIGHT_OFFSET,
@@ -167,7 +186,7 @@ function createOrthoCamera(renderer) {
   // re-aiming/orbiting around frameTarget.
   const viewDir = frameTarget.clone().sub(cameraPos).normalize();
   const screenRight = new THREE.Vector3().crossVectors(viewDir, new THREE.Vector3(0, 1, 0)).normalize();
-  const pan = screenRight.multiplyScalar(FRAME_CENTER_X_OFFSET);
+  const pan = screenRight.multiplyScalar(frameOffsets.x);
   frameTarget.add(pan);
   cameraPos.add(pan);
 

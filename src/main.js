@@ -1068,6 +1068,45 @@ function collapseMainMenu() {
   mainMenuListEl?.classList.add('collapsed');
 }
 
+// Touch devices: tap a dropdown parent to open it.
+//
+// The submenus above are opened purely by CSS :hover, which simply doesn't
+// exist on a phone. iOS fakes it - the first tap on an element with a :hover
+// rule applies that state, and it only clears when you tap somewhere else -
+// so the menu half-works in a way that feels broken rather than obviously
+// broken. Worse, that emulated hover means the first tap on PORTFOLIO gets
+// swallowed opening the submenu, so it reads as an unresponsive menu.
+//
+// Explicit .open class on touch instead, toggled here and styled in the
+// mobile media query in style.css. Desktop still uses :hover and never adds
+// this class, so nothing changes there.
+if (IS_MOBILE) {
+  for (const label of document.querySelectorAll('#main-menu-list .menu-label')) {
+    label.addEventListener('click', (e) => {
+      const li = label.closest('.has-submenu');
+      if (!li) return;
+      // Stop this from also counting as a click on the menu behind it.
+      e.preventDefault();
+      e.stopPropagation();
+      const wasOpen = li.classList.contains('open');
+      // Only one submenu open at a time - two expanded lists don't fit on a
+      // phone screen next to each other.
+      for (const other of document.querySelectorAll('#main-menu-list .has-submenu.open')) {
+        other.classList.remove('open');
+      }
+      if (!wasOpen) li.classList.add('open');
+    });
+  }
+  // Tapping any actual destination closes the dropdown behind it.
+  for (const item of document.querySelectorAll('#main-menu-list li[data-route]')) {
+    item.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('#main-menu-list .has-submenu.open')) {
+        other.classList.remove('open');
+      }
+    });
+  }
+}
+
 // Logo click - only does anything in walk mode (title screen already shows
 // the list permanently, no toggle needed there).
 document.getElementById('main-menu-logo')?.addEventListener('click', () => {

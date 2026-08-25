@@ -166,6 +166,63 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
     image-rendering: pixelated;
     image-rendering: crisp-edges; /* older WebKit spelling, harmless fallback */
   }
+
+  /* ---- Corner menu on touch ----------------------------------------------
+     Two problems this fixes.
+
+     1. The dropdowns open on :hover, which a phone doesn't have. iOS fakes it
+        (first tap applies hover, tapping elsewhere clears it), so the menu
+        half-worked in a confusing way and the first tap on PORTFOLIO always
+        got eaten. main.js adds .open on tap for touch devices instead; these
+        rules are what .open actually does.
+     2. There was no mobile sizing at all - desktop's 26px headings and 40px
+        inset are a lot of a small screen once a 5-item submenu is expanded.
+        Everything below is scaled to fit and given real tap targets rather
+        than mouse-sized ones. */
+  #main-menu {
+    top: 20px;
+    left: 20px;
+    gap: 14px;
+    max-width: calc(100vw - 40px);
+  }
+  #main-menu-logo { width: 46px; }
+
+  #main-menu-list > li:not(.has-submenu),
+  .menu-label {
+    font-size: 19px;
+    /* Vertical padding is the tap target - 19px of text alone is a small
+       thing to hit accurately with a thumb. */
+    padding: 5px 0;
+  }
+
+  .submenu { padding-left: 10px; }
+  .submenu li {
+    font-size: 14px;
+    padding: 7px 0;
+    opacity: 0.9;
+  }
+
+  /* Tap-driven open state. Mirrors the :hover rules further up, so an open
+     submenu looks identical either way - only the trigger differs. */
+  .has-submenu.open .submenu {
+    max-height: 320px;
+    opacity: 1;
+    margin-top: 6px;
+  }
+  .has-submenu.open .menu-arrow { transform: rotate(90deg); }
+
+  /* Kill the emulated-hover version on touch so it can't fight .open and
+     leave a submenu stuck open after you've tapped away from it. */
+  .has-submenu:hover .submenu {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+  }
+  .has-submenu.open .submenu {
+    max-height: 320px;
+    opacity: 1;
+    margin-top: 6px;
+  }
 }
 
 #touch-controls {

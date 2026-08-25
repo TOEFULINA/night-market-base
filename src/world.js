@@ -111,9 +111,17 @@ function createSkyGradientTexture() {
   // flat background used to be, darkened a touch per "a bit darker", now
   // lightened slightly (3a3742 -> 4a4555) so it actually registers as
   // purple against the dark rather than reading as more black.
-  gradient.addColorStop(0, '#0e0c13');
-  gradient.addColorStop(0.35, '#4a4555');
-  gradient.addColorStop(1, '#4a4555');
+  // "i want this to fade to black not grey" - the fog was already pure black
+  // (see scene.fog below), so the grey haze the buildings dissolved into was
+  // never the fog, it was THIS backdrop showing through: the horizon stop sat
+  // at #4a4555, a light greyish-purple, so anything fogged out to nothing
+  // still landed on grey. Whole ramp is black now, top and horizon, which
+  // makes the backdrop agree with the black fog instead of fighting it.
+  // Keeping the gradient (rather than swapping in a flat Color) so the stops
+  // stay here as one obvious knob if you ever want the tint back.
+  gradient.addColorStop(0, '#000000');
+  gradient.addColorStop(0.35, '#000000');
+  gradient.addColorStop(1, '#000000');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
@@ -946,6 +954,39 @@ async function addStreetScene(scene) {
       }
     } else {
       console.warn('[ground extension] Plane.002 not found/no material - skipping grey-out');
+    }
+
+    // "the building grey is way too light, i think the fog is only black at a
+    // distance" - right on both counts. Fog is linear between near=7 and
+    // far=32, so a surface sitting ~12-18 units out only picks up a fraction
+    // of it; the big background buildings are close enough (and tall enough)
+    // that most of their face reads at near-full material brightness. The fog
+    // isn't the thing to change - pulling it in far enough to darken these
+    // would also swallow the storefronts you actually want visible.
+    // Darkening the buildings' own base colour instead: multiplyScalar keeps
+    // whatever texture/shading detail is already baked in and just scales it
+    // down, unlike .set() which would flatten them to a solid block. 0.35 is
+    // the knob - lower is darker.
+    const BG_BUILDING_NODE_NAMES = [
+      'tripo_node_1b17d649-d3ad-4287-9088-27fc9b46c0de',
+      'tripo_node_4bae5984-e7fd-4e13-b2cc-a0c2456c2ee1.001',
+    ];
+    const BG_BUILDING_DARKEN = 0.35;
+    for (const rawName of BG_BUILDING_NODE_NAMES) {
+      const node = street.getObjectByName(sanitizeGltfName(rawName));
+      if (!node) {
+        console.warn(`[bg building darken] ${rawName} not found - skipping`);
+        continue;
+      }
+      node.traverse((obj) => {
+        if (!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (!mat?.color) continue;
+          mat.color.multiplyScalar(BG_BUILDING_DARKEN);
+          mat.needsUpdate = true;
+        }
+      });
     }
 
     // "we have a missing sign mesh" - the blank panel next to the 3D

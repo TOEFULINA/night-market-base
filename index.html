@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Night Market — rough base</title>
+  <title>TOEFU MART</title>
+  <!-- Tab/bookmark icon, built from the same /logo.png the menu and loading
+       screen use. Not logo.png directly: that's white artwork on a
+       transparent background, which vanishes against a light tab bar - these
+       are pre-composited onto the site's #05060a dark, trimmed to the ink and
+       padded so the mark fills the tile at 32px. -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -77,6 +84,7 @@
   <div id="loading-screen">
     <img id="loading-logo" src="/logo.png" alt="loading" />
     <div id="loading-percent">0%</div>
+    <div id="loading-subline">Give it a second pls!<br />There's a lot going on in here.</div>
   </div>
 
   <div id="intro-overlay">

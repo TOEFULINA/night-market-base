@@ -27,12 +27,21 @@ const camera = new THREE.PerspectiveCamera(
   CAMERA_FOV,
   window.innerWidth / window.innerHeight,
   0.1,
-  // TEMP: bumped from 120 to cover the street scene's raw extent. This is a
-  // rough guess, not tuned - once you've seen it running we should pull
-  // this back down to whatever the actual visible/usable range is, since a
-  // huge far plane means the GPU still has to consider everything within
-  // it every frame.
-  2500
+  // Was a flat 2500 with a "TEMP... pull this back down once you've seen it
+  // running" note. Measured the real extents rather than guessing again:
+  // mobile scene geometry reaches ~28 units from origin, the star shell sits
+  // at radius 140 (atmosphere.js's STAR_RADIUS), and the player stays inside
+  // WORLD_RADIUS=30 - so the furthest anything can ever be from the camera is
+  // ~170. 250 clears that with real margin while being 10x tighter than 2500,
+  // which buys back a lot of depth-buffer precision (z-fighting headroom) and
+  // lets frustum culling discard more.
+  //
+  // Mobile ONLY. Desktop's DOF shader linearizes depth using uCameraFar (see
+  // postprocessing.js), so changing far there would move where the distance
+  // blur kicks in - i.e. it'd visibly change the desktop look, which you
+  // asked to leave alone. Mobile has DOF off entirely now, so there's nothing
+  // for this to interact with there.
+  IS_MOBILE ? 250 : 2500
 );
 // Layer 1 = "walk-mode-only" geometry (currently just the new ground plane
 // and wall+building from TRY6_SCENE.glb, see world.js's TITLE_HIDDEN_NODE_NAMES) -
@@ -1559,8 +1568,14 @@ function tick() {
     // title camera. depthPrepassPass/dofPass toggle together, see
     // postprocessing.js's DepthPrepassPass writeup for why they're two
     // passes instead of one.
-    post.depthPrepassPass.enabled = !orthoActive;
-    post.dofPass.enabled = !orthoActive;
+    // ...except on mobile, where DOF is off entirely (see postprocessing.js's
+    // IS_MOBILE notes) - depthPrepassPass re-renders the WHOLE scene a second
+    // time every frame just to fill a depth texture, which on a ~600-mesh
+    // scene means roughly double the draw calls per frame. That's the single
+    // biggest remaining render-side cost on mobile, and it lines up with the
+    // "Rendering" (not Script) categorization in the Safari timeline.
+    post.depthPrepassPass.enabled = !orthoActive && !IS_MOBILE;
+    post.dofPass.enabled = !orthoActive && !IS_MOBILE;
     post.renderPass.camera = orthoActive ? titleScreen.camera : camera;
   } else {
     scene.fog = null;

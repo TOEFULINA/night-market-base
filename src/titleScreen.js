@@ -123,7 +123,7 @@ const FRAME_CENTER_X_OFFSET = 0.5;
 // shift means a POSITIVE delta. Desktop's own X/Y offsets above are
 // untouched.
 const FRAME_CENTER_X_OFFSET_MOBILE = FRAME_CENTER_X_OFFSET - 3.6;
-const FRAME_CENTER_Y_OFFSET_MOBILE = FRAME_CENTER_Y_OFFSET + 3.0;
+const FRAME_CENTER_Y_OFFSET_MOBILE = FRAME_CENTER_Y_OFFSET + 2.4;
 function currentFrameCenterOffsets() {
   return IS_MOBILE
     ? { x: FRAME_CENTER_X_OFFSET_MOBILE, y: FRAME_CENTER_Y_OFFSET_MOBILE }

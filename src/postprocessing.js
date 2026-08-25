@@ -23,6 +23,12 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 
+// Same touch-device check the rest of the project uses (declared per-file by
+// convention here rather than shared/imported - see world.js/main.js). Used
+// below to trim the two heaviest passes on mobile: bloom, and the DOF
+// depth pre-pass (which costs a whole second scene render per frame).
+const IS_MOBILE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 // Title-screen-only radial defocus ("blur around the edges and farthest
 // parts, lines are too hard"). Not real depth-of-field (that needs a depth
 // texture + a focus distance tuned to actual scene geometry, more setup
@@ -289,6 +295,7 @@ class DepthPrepassPass extends Pass {
     this.needsSwap = false;
   }
   render(renderer) {
+    if (!this.depthTarget) return; // mobile - target never allocated, pass never enabled
     const prevTarget = renderer.getRenderTarget();
     renderer.setRenderTarget(this.depthTarget);
     renderer.render(this.scene, this.camera);
@@ -306,12 +313,19 @@ export function createPostProcessing(renderer, scene, camera) {
   // perspective camera only (DOF is walk-only, see main.js's tick() -
   // title mode never enables depthPrepassPass/dofPass, so this target
   // just sits unused/free at zero extra cost while on the title screen).
-  const depthTexture = new THREE.DepthTexture();
-  depthTexture.type = THREE.UnsignedIntType;
-  const depthTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
-    depthTexture,
-    depthBuffer: true,
-  });
+  // Mobile never enables depthPrepassPass/dofPass (see main.js's tick), so
+  // this full-screen render target + depth texture would just sit allocated
+  // and never be written or read - skip creating it there at all. The passes
+  // below are still constructed either way so the returned shape stays
+  // identical and main.js needs no null-checks; they're simply never enabled.
+  const depthTexture = IS_MOBILE ? null : new THREE.DepthTexture();
+  if (depthTexture) depthTexture.type = THREE.UnsignedIntType;
+  const depthTarget = IS_MOBILE
+    ? null
+    : new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+        depthTexture,
+        depthBuffer: true,
+      });
 
   // camera is reassigned per-frame in main.js (title screen's orthographic
   // camera vs. the walk mode perspective camera share this one composer/
@@ -339,6 +353,14 @@ export function createPostProcessing(renderer, scene, camera) {
     0.2, // radius
     0.95 // threshold
   );
+  // Off on mobile. UnrealBloomPass is by far the most expensive pass in this
+  // chain - it allocates 5 mip-level render targets and does a separate
+  // downsample + upsample blur draw at each one, so it's ~10 extra
+  // fullscreen passes plus their buffers, every frame. At strength 0.15 /
+  // threshold 0.95 it's already a very faint glow on the brightest sign
+  // panels only, so this is close to the best cost/visual-loss ratio
+  // available here. Desktop keeps it exactly as tuned.
+  bloomPass.enabled = !IS_MOBILE;
   composer.addPass(bloomPass);
 
   // Title-screen-only radial defocus, see TILT_SHIFT_SHADER above. Toggle
@@ -396,7 +418,7 @@ export function createPostProcessing(renderer, scene, camera) {
       composer.setSize(width, height);
       tiltShiftPass.uniforms.uResolution.value.set(width, height);
       dofPass.uniforms.uResolution.value.set(width, height);
-      depthTarget.setSize(width, height);
+      depthTarget?.setSize(width, height); // null on mobile - never allocated
     },
   };
 }

@@ -1177,7 +1177,7 @@ const BIKE_LOADING_TOKEN = 'bike-model-load';
 async function addBike(scene) {
   loadingManager.itemStart(BIKE_LOADING_TOKEN);
   try {
-    const { scene: bike } = await loadModel('/models/BIKE.glb');
+    const { scene: bike } = await loadModel(modelPath('/models/BIKE.glb'));
     bike.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
@@ -1253,7 +1253,7 @@ async function addMe(scene) {
 async function addLoki(scene) {
   loadingManager.itemStart(LOKI_LOADING_TOKEN);
   try {
-    const { scene: loki } = await loadModel('/models/LOKI.glb');
+    const { scene: loki } = await loadModel(modelPath('/models/LOKI.glb'));
     loki.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
@@ -1376,7 +1376,7 @@ const SIGNS_LOADING_TOKEN = 'signs-model-load';
 async function addSigns(scene) {
   loadingManager.itemStart(SIGNS_LOADING_TOKEN);
   try {
-    const { scene: signs } = await loadModel('/models/SIGNS.glb');
+    const { scene: signs } = await loadModel(modelPath('/models/SIGNS.glb'));
     signs.traverse((obj) => {
       if (!obj.isMesh) return;
       const rawMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;

@@ -68,7 +68,19 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, powerP
 // Capped further to 1x on mobile - every full-screen render target below
 // (composer buffers, shadow map, depth target) scales with this squared,
 // so 2x -> 1x is a 4x cut in framebuffer memory on top of the texture cut.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1 : 2));
+// "i actually love the pixely edges on the mesh... like nintendo DS, so early
+// video game. we can make it even more of that if it helps" - and it does help,
+// which is the nice part: this is a deliberate look AND the single cheapest
+// perf lever available. Rendering below 1.0 means the GPU shades fewer pixels,
+// and fill cost scales with pixel COUNT (area), so 0.65 renders about 42% of
+// the pixels of 1.0. The chunky stair-stepped mesh edges you like are the
+// aliasing that falls out of that low internal resolution, then gets upscaled
+// to the screen - style.css sets image-rendering:pixelated on #scene for
+// mobile so the upscale stays hard-edged and blocky instead of being smoothed
+// into mush by the browser's default bilinear filtering.
+// Lower = chunkier + faster. Desktop is untouched.
+const MOBILE_PIXEL_SCALE = 0.65;
+renderer.setPixelRatio(IS_MOBILE ? MOBILE_PIXEL_SCALE : Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Real-time shadows, turned on per your call - the flat/shadowless look
 // was the actual complaint, and this scene is small/compact enough
@@ -1236,6 +1248,22 @@ portfolioLightboxEl?.addEventListener('click', (e) => {
 // close button/Escape below AND defensively at the start of every other
 // flight (startTransition/flyToLocation/startReturnToTitle) so it can't
 // linger on screen while you fly somewhere else.
+// Contact overlay - flat panel, no 3D flight (see index.html's #contact-overlay
+// comment). Opened/closed straight from navigateToRoute below.
+const contactOverlayEl = document.getElementById('contact-overlay');
+const contactOverlayCloseBtn = document.getElementById('contact-overlay-close');
+
+function showContactOverlay() {
+  contactOverlayEl?.classList.remove('hidden');
+}
+function hideContactOverlay() {
+  contactOverlayEl?.classList.add('hidden');
+}
+contactOverlayCloseBtn?.addEventListener('click', () => {
+  hideContactOverlay();
+  navigateToRoute(mode === 'walk' ? 'explore-archive-shop' : 'home');
+});
+
 const aboutOverlayEl = document.getElementById('about-overlay');
 const aboutOverlayScrollEl = document.getElementById('about-overlay-scroll');
 const aboutOverlayCloseBtn = document.getElementById('about-overlay-close');
@@ -1267,6 +1295,7 @@ window.addEventListener('keydown', (e) => {
   if (!portfolioLightboxEl.classList.contains('hidden')) closePortfolioLightbox();
   else if (!portfolioGalleryEl.classList.contains('hidden')) closePortfolioGallery();
   else if (!aboutOverlayEl?.classList.contains('hidden')) hideAboutOverlay();
+  else if (!contactOverlayEl?.classList.contains('hidden')) hideContactOverlay();
 });
 
 // Single dispatcher for "go to this route", used by menu clicks, browser
@@ -1291,6 +1320,8 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   if (!PORTFOLIO_CATEGORIES[route] && !portfolioGalleryEl.classList.contains('hidden')) {
     closePortfolioGallery();
   }
+  // Same idea for Contact - navigating anywhere else dismisses it.
+  if (route !== 'contact') hideContactOverlay();
 
   if (pushHistory) {
     const path = pathForRoute(route);
@@ -1330,6 +1361,15 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   // the logo handler's own guard.
   if (PORTFOLIO_CATEGORIES[route]) {
     openPortfolioGallery(route);
+    if (mode === 'walk') collapseMainMenu();
+    return;
+  }
+
+  // Contact - same deal as the portfolio categories above: a flat overlay with
+  // no LOCATIONS entry, so it has to be handled before the "no destination
+  // wired yet" fallthrough below rather than after it.
+  if (route === 'contact') {
+    showContactOverlay();
     if (mode === 'walk') collapseMainMenu();
     return;
   }
@@ -1499,12 +1539,13 @@ function updateTouchControlsVisibility() {
   if (!IS_MOBILE || !touchControlsEl) return;
   const aboutHidden = !aboutOverlayEl || aboutOverlayEl.classList.contains('hidden');
   const portfolioHidden = !portfolioGalleryEl || portfolioGalleryEl.classList.contains('hidden');
+  const contactHidden = !contactOverlayEl || contactOverlayEl.classList.contains('hidden');
   // "still there on main menu" - this was the walk-mode dropdown menu (tap to
   // open a list of destinations), not the title screen - mode is still 'walk'
   // while that menu is open, so the old check missed it. mainMenuListEl only
   // has 'collapsed' removed while the dropdown is expanded.
   const menuClosed = !mainMenuListEl || mainMenuListEl.classList.contains('collapsed');
-  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden && menuClosed;
+  const show = mode === 'walk' && !!controls && !controls.locked && aboutHidden && portfolioHidden && contactHidden && menuClosed;
   touchControlsEl.classList.toggle('hidden', !show);
 }
 

@@ -123,7 +123,7 @@ const FRAME_CENTER_X_OFFSET = 0.5;
 // shift means a POSITIVE delta. Desktop's own X/Y offsets above are
 // untouched.
 const FRAME_CENTER_X_OFFSET_MOBILE = FRAME_CENTER_X_OFFSET - 3.6;
-const FRAME_CENTER_Y_OFFSET_MOBILE = FRAME_CENTER_Y_OFFSET + 3.6;
+const FRAME_CENTER_Y_OFFSET_MOBILE = FRAME_CENTER_Y_OFFSET + 3.0;
 function currentFrameCenterOffsets() {
   return IS_MOBILE
     ? { x: FRAME_CENTER_X_OFFSET_MOBILE, y: FRAME_CENTER_Y_OFFSET_MOBILE }
@@ -254,6 +254,16 @@ export class TitleScreen {
   // asked for, it's also the version that actually produces a real
   // depth-parallax cue here - translation was the one giving up on that.
   update(delta) {
+    // "would killing the parallax on mobile help with anything? you dont
+    // drag your finger around on screen as much" - right, there's no
+    // continuous pointermove on a phone the way there is with a mouse
+    // hovering, so this was already visually a no-op on mobile - just
+    // paying the ease/lookAt() cost every frame for nothing. Skip it
+    // outright: camera stays at the lookAt() already set once in
+    // createOrthoCamera(), so this is a real (if small) per-frame save,
+    // not just dead code removal. Desktop behavior untouched.
+    if (IS_MOBILE) return;
+
     // Framerate-independent exponential ease toward the raw pointer
     // position - closes roughly half the remaining gap every
     // PARALLAX_EASE_HALF_LIFE seconds regardless of frame rate, instead of

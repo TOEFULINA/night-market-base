@@ -956,6 +956,29 @@ async function addStreetScene(scene) {
       console.warn('[ground extension] Plane.002 not found/no material - skipping grey-out');
     }
 
+    // "that mesh i thought was a repeat is still clipping thru the sidewalk,
+    // move it up, no clip at all even if tiny tiny gap" - the yellow tactile
+    // paving strip. Not a duplicate mesh after all (that was the earlier
+    // theory): it's three pieces sharing Material_#105_StandtoVR, all sitting
+    // at y ~0.034-0.047, which is level with the sidewalk surface rather than
+    // on top of it. Coplanar-ish geometry like that intersects and z-fights
+    // instead of resting cleanly.
+    // Nudging up in WORLD space, not touching node.scale - these nodes are
+    // scaled ~0.0254, so editing local Y would need dividing by that scale to
+    // mean anything, and it'd silently break if the export's scale ever
+    // changes. Small enough to read as flush from eye level, large enough to
+    // clear the depth buffer's precision at this distance.
+    const TACTILE_STRIP_NODE_NAMES = ['Box1913', 'Box1924', 'Object1405100643'];
+    const TACTILE_STRIP_LIFT = 0.015;
+    for (const rawName of TACTILE_STRIP_NODE_NAMES) {
+      const node = street.getObjectByName(sanitizeGltfName(rawName));
+      if (node) {
+        node.position.y += TACTILE_STRIP_LIFT;
+      } else {
+        console.warn(`[tactile strip] ${rawName} not found - skipping lift`);
+      }
+    }
+
     // "the building grey is way too light, i think the fog is only black at a
     // distance" - right on both counts. Fog is linear between near=7 and
     // far=32, so a surface sitting ~12-18 units out only picks up a fraction

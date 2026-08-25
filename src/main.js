@@ -516,7 +516,7 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
-  if (debugPosEl) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout
+  if (debugPosEl && !IS_MOBILE) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout - dev-only tool, no reason to show visitors on mobile
 
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
@@ -1415,7 +1415,7 @@ const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 // comment in index.html - delete the #debug-pos div (index.html + style.css)
 // and this block once you're done using it.
 function updatePositionDebug() {
-  if (!debugPosEl || !controls) return;
+  if (!debugPosEl || !controls || IS_MOBILE) return; // dev-only tool - stays hidden and skips the per-frame work on mobile
   const p = controls.camera.position;
   const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
   const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);

@@ -1617,21 +1617,58 @@ function updateTouchControlsVisibility() {
 // three.js re-uploads textures and geometry lazily on the next render after
 // the context comes back, so nothing here needs to rebuild the scene.
 let glContextLost = false;
+let pageHidden = false;
+// Guards against two loops running at once. Both the context-restore and the
+// visibility handlers can want to restart the loop, and if they ever fire
+// close together without this you'd end up with two rAF chains ticking the
+// same scene - double movement speed, double the work.
+let loopRunning = false;
+
+function startLoop() {
+  if (loopRunning || glContextLost || pageHidden) return;
+  loopRunning = true;
+  requestAnimationFrame(tick);
+}
+
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   glContextLost = true;
+  loopRunning = false;
   console.warn('[webgl] context lost - pausing render loop until restored');
 }, false);
 canvas.addEventListener('webglcontextrestored', () => {
   glContextLost = false;
   console.warn('[webgl] context restored - resuming');
-  requestAnimationFrame(tick);
+  startLoop();
 }, false);
 
+// Stop rendering entirely while the page isn't on screen.
+//
+// Backgrounding a tab is one of the moments iOS is most likely to reclaim
+// memory from it, and a page still burning GPU time in the background is a
+// much more attractive target. Browsers throttle rAF when hidden but don't
+// reliably stop it, so this makes it explicit.
+// clock.getDelta() is also reset on the way back - otherwise the first frame
+// after returning carries the entire time you were away, and the existing
+// 0.1s clamp in tick() is the only thing standing between that and the player
+// being flung across the scene.
+document.addEventListener('visibilitychange', () => {
+  pageHidden = document.hidden;
+  if (pageHidden) {
+    loopRunning = false;
+  } else {
+    clock.getDelta();
+    startLoop();
+  }
+});
+
 function tick() {
-  // Loop deliberately ends here while the context is gone; the restore
-  // handler above is what starts it again.
-  if (glContextLost) return;
+  // Loop deliberately ends here while the context is gone or the page is
+  // hidden; startLoop() above is what brings it back.
+  if (glContextLost || pageHidden) {
+    loopRunning = false;
+    return;
+  }
 
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
@@ -1756,4 +1793,8 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-tick();
+// Goes through startLoop() rather than calling tick() directly so loopRunning
+// is tracked from the very first frame - otherwise the flag would read false
+// while the loop was actually going, and the first visibility change could
+// start a second one alongside it.
+startLoop();

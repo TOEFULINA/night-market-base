@@ -949,7 +949,13 @@ async function addStreetScene(scene) {
       for (const mat of mats) {
         if (!mat) continue;
         mat.map = null;
-        mat.color.set(0x2a2a2a);
+        // "i want it darker like almost black" - 0x2a2a2a -> 0x0a0a0a. Not
+        // fully black on purpose: the standalone fallback ground plane under
+        // this sits at 0x030303, so pure black here would make the two
+        // indistinguishable and you'd lose the edge where the street plane
+        // ends. A few values above it keeps that separation readable while
+        // still reading as black.
+        mat.color.set(0x0a0a0a);
         mat.needsUpdate = true;
       }
     } else {

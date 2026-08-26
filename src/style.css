@@ -224,6 +224,33 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
     margin-top: 6px;
   }
 
+  /* The Portfolio and About pages need their own copy of those two rules, at
+     matching specificity.
+     Further down this file there's `body.portfolio-open .has-submenu:hover
+     .submenu` - that's four class-level selectors. The plain
+     `.has-submenu.open .submenu` just above is only three, so on those two
+     pages the emulated-hover rule WON and tapping a dropdown appeared to do
+     nothing at all. Re-stating both sides with the body scope puts them on
+     equal footing; source order then decides, and .open comes last. */
+  body.portfolio-open .has-submenu:hover .submenu,
+  body.about-open .has-submenu:hover .submenu {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  body.portfolio-open .has-submenu.open .submenu,
+  body.about-open .has-submenu.open .submenu {
+    max-height: 320px;
+    opacity: 1;
+    margin-top: 6px;
+    padding: 10px 14px;
+    background: #fff;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  }
+
   /* ---- Portfolio grid on touch -------------------------------------------
      "i want the collages in portfolio to be on mobile instead of a one at a
      time scroll". The grid is a CSS multi-column masonry whose column count

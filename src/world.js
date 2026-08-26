@@ -876,7 +876,26 @@ async function addStreetScene(scene) {
           if (!mat) return mat;
           if (mat.side === THREE.DoubleSide) mat.shadowSide = THREE.FrontSide;
 
-          if (LIT_EXCEPTION_MATERIAL_NAMES.has(mat.name)) return mat;
+          // "kill normals on vinyl walls on mobile too" -> "everything unlit".
+          // On mobile there are no lit exceptions at all: the four materials
+          // that stayed MeshStandardMaterial (record store walls, vinyl
+          // records) go through toUnlitFlat like everything else.
+          // That does three things at once - it drops their normal and
+          // roughness maps (toUnlitFlat only reads the base colour map), it
+          // removes the last per-pixel lighting work in the scene, and it
+          // makes those surfaces match the flat baked look of everything
+          // around them, which is what the pixel-filtering direction wants
+          // anyway. Desktop keeps its exceptions untouched.
+          if (!IS_MOBILE && LIT_EXCEPTION_MATERIAL_NAMES.has(mat.name)) return mat;
+          if (IS_MOBILE) {
+            // Free the maps the unlit material will never sample. Safe to
+            // dispose here specifically because nothing is lit on mobile
+            // anymore, so no other material can still be using them.
+            for (const slot of ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap']) {
+              mat[slot]?.dispose?.();
+              mat[slot] = null;
+            }
+          }
           const unlit = toUnlitFlat(mat);
           if (unlit.side === THREE.DoubleSide) unlit.shadowSide = THREE.FrontSide;
           unlit.polygonOffset = true;

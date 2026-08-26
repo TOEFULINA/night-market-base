@@ -79,7 +79,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, powerP
 // mobile so the upscale stays hard-edged and blocky instead of being smoothed
 // into mush by the browser's default bilinear filtering.
 // Lower = chunkier + faster. Desktop is untouched.
-const MOBILE_PIXEL_SCALE = 0.65;
+const MOBILE_PIXEL_SCALE = 0.5;
 renderer.setPixelRatio(IS_MOBILE ? MOBILE_PIXEL_SCALE : Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Real-time shadows, turned on per your call - the flat/shadowless look
@@ -1430,6 +1430,18 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
 
 document.querySelectorAll('#main-menu-list li[data-route]').forEach((li) => {
   li.addEventListener('click', () => navigateToRoute(li.dataset.route));
+});
+
+// External links in the menu (currently just "Loot" -> toefu.nyc). These use
+// data-href rather than data-route deliberately: there's no LOCATIONS entry
+// and nothing in the 3D scene to fly to, so routing them through
+// navigateToRoute would just hit its "no destination wired yet" branch.
+// noopener/noreferrer on the opened window for the usual reason - without it
+// the new tab gets a handle back to this one via window.opener.
+document.querySelectorAll('#main-menu-list li[data-href]').forEach((li) => {
+  li.addEventListener('click', () => {
+    window.open(li.dataset.href, '_blank', 'noopener,noreferrer');
+  });
 });
 
 // Browser back/forward - re-run whatever route the URL now points at,

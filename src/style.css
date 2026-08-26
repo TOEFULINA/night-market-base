@@ -205,16 +205,16 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
         Everything below is scaled to fit and given real tap targets rather
         than mouse-sized ones. */
   #main-menu {
-    top: 20px;
-    left: 20px;
-    gap: 14px;
-    max-width: calc(100vw - 40px);
+    top: 16px;
+    left: 16px;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
   }
-  #main-menu-logo { width: 46px; }
+  #main-menu-logo { width: 34px; }
 
   #main-menu-list > li:not(.has-submenu),
   .menu-label {
-    font-size: 19px;
+    font-size: 15px;
     /* Tighter than it was: padding was 5px top AND bottom, so every pair of
        items had 10px of dead space between them on top of the list's own gap
        and the line box. Halved, and the line box pulled in from 1.15 to 1.0,
@@ -227,10 +227,10 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   }
   #main-menu-list { gap: 0; }
 
-  .submenu { padding-left: 10px; }
+  .submenu { padding-left: 8px; }
   .submenu li {
-    font-size: 14px;
-    padding: 7px 0;
+    font-size: 12px;
+    padding: 5px 0;
     opacity: 0.9;
   }
 

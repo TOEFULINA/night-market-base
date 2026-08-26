@@ -165,14 +165,19 @@ vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
 const debugPosEl = document.getElementById('debug-pos'); // back per your ask, see index.html's comment on this element
 
-// Dev-only coordinate readout - hidden unless you press D in walk mode.
+// Dev-only coordinate readout - hidden unless you press ` (backtick) in walk
+// mode.
 // It's how you grab LOCATIONS coordinates, but visitors were seeing the raw
 // x/y/z/yaw/pitch dump plus the "meshes:690 ... rebakes: disabled" status
 // line sitting over the scene on every desktop visit.
 // (This existed before and was lost in the rollback - restoring it.)
 let debugHudVisible = false;
 window.addEventListener('keydown', (e) => {
-  if (e.key !== 'd' && e.key !== 'D') return;
+  // Backtick, not D - D is strafe-right in WASD, so the old binding fired the
+  // HUD every time you sidestepped. Checked the rest of the scheme too:
+  // W/A/S/D, the arrow keys, Shift and Escape are all taken; ` is free, and
+  // it's the conventional debug-console key anyway.
+  if (e.code !== 'Backquote') return;
   if (mode !== 'walk' || IS_MOBILE) return;
   // Don't steal the key while something's being typed into.
   const t = e.target;
@@ -566,7 +571,7 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
-  // Stays hidden on entering walk mode - press D to bring it up. See the
+  // Stays hidden on entering walk mode - press ` to bring it up. See the
   // keydown handler where debugHudVisible is declared.
   if (debugPosEl) debugPosEl.style.display = debugHudVisible ? '' : 'none';
 

@@ -1061,15 +1061,21 @@ body.about-open #main-menu-list {
   gap: 48px;
   align-items: end;
 }
+/* "it should also have 2 columns on mobile too" - these used to collapse to
+   a single column under 900px. Kept at two, just with the fixed 300px
+   sidebar swapped for a proportional split so it still fits a phone. */
 @media (max-width: 900px) {
-  .about-header-row { grid-template-columns: 1fr; }
+  .about-header-row { grid-template-columns: 38% 1fr; gap: 14px; }
 }
 
+/* Empty frame, no fill - the photo is gone and this now sits over the 3D
+   model's head in the scene behind the overlay. The old 8% white wash would
+   have greyed the model out through it, so it's fully transparent. */
 .about-profile-pic {
   width: 100%;
   aspect-ratio: 1;
   border: 2px solid #fff;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
 }
 
 .about-header h1 {
@@ -1107,7 +1113,7 @@ body.about-open #main-menu-list {
   margin-top: 28px;
 }
 @media (max-width: 900px) {
-  .about-columns { grid-template-columns: 1fr; }
+  .about-columns { grid-template-columns: 38% 1fr; gap: 14px; }
 }
 
 .about-contact-list {

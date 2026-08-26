@@ -374,7 +374,10 @@ const LOCATIONS = {
   // the same spot within a few cm and added pitch:17°. Same
   // LOCATIONS/flyToLocation path every other menu destination uses, so
   // clicking "About" flies here the same way Explore items do.
-  about: { x: -15.16, y: 1.3, z: -18.87, yawDeg: 170, pitchDeg: 17 },
+  // Re-framed off your debug-HUD readout rather than guessed: same standing
+  // spot, just turned to face the model more side-on (yaw 170 -> 113) and
+  // tilted up a touch (pitch 17 -> 21).
+  about: { x: -15.16, y: 1.3, z: -18.87, yawDeg: 113, pitchDeg: 21 },
   // Close-up on the vinyl wall display - "i want the camera to snap to this
   // wall display" - debug-HUD coordinates off your screenshot standing right
   // in front of it (x:-6.93, y:1.30, z:-13.57, yaw:270°, pitch:0°). Not an

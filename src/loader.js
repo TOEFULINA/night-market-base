@@ -133,11 +133,54 @@ export function initLoadingUI(onComplete) {
  *   scene.position.set(4, 0, -2);
  *   world.add(scene);
  */
+// Nearest-neighbour texture filtering on mobile.
+//
+// "when we make textures smaller we lose detail thru blur - is there a way to
+// compress to a pixel art dimension so small they actually dont blur but just
+// pixel" - yes, and the blur was never the resize. It's how the GPU SAMPLES
+// the texture: the default is bilinear, which blends between neighbouring
+// texels, so a 32px image stretched across a wall reads as smooth mush.
+// NearestFilter takes the single closest texel with no blending, so those
+// same 32 pixels render as hard-edged blocks. Zero cost, zero file-size
+// change - it's a sampler setting, not a texture change.
+//
+// minFilter stays mipmap-based rather than plain NEAREST. Mipmaps are what
+// stop distant surfaces shimmering as you walk, and NearestMipmapLinear keeps
+// each mip level's texels crisp while fading smoothly BETWEEN levels - the
+// standard pixel-art-in-3D combination. Going full NEAREST here would look
+// sharp standing still and crawl with aliasing the moment you moved.
+//
+// anisotropy back to 1: it exists to keep grazing-angle surfaces sharp by
+// taking extra samples, which is the opposite of what's wanted here and costs
+// fill rate on a phone.
+function applyPixelFiltering(gltf) {
+  const seen = new Set();
+  gltf.scene.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      for (const slot of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap']) {
+        const tex = mat[slot];
+        if (!tex || seen.has(tex)) continue;
+        seen.add(tex);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestMipmapLinearFilter;
+        tex.anisotropy = 1;
+        tex.needsUpdate = true;
+      }
+    }
+  });
+}
+
 export function loadModel(path) {
   return new Promise((resolve, reject) => {
     gltfLoader.load(
       path,
-      (gltf) => resolve({ scene: gltf.scene, gltf }),
+      (gltf) => {
+        if (IS_MOBILE) applyPixelFiltering(gltf);
+        resolve({ scene: gltf.scene, gltf });
+      },
       undefined,
       reject
     );

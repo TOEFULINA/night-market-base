@@ -994,7 +994,15 @@ async function addStreetScene(scene) {
       'tripo_node_1b17d649-d3ad-4287-9088-27fc9b46c0de',
       'tripo_node_4bae5984-e7fd-4e13-b2cc-a0c2456c2ee1.001',
     ];
-    const BG_BUILDING_DARKEN = 0.35;
+    // "far away mesh should blur to black not grey" - 0.35 -> 0.12.
+    // These two are huge (one is ~51x37x67 units), so even though they read as
+    // "far away" their near faces sit well inside the fog's 7->32 range and
+    // only pick up partial fog. Partial fog over a mid-grey texture is exactly
+    // the grey slab you're seeing. Fog can't fix it without pulling the whole
+    // scene's draw distance in, so the buildings' own base colour comes down
+    // instead - now near-black to start with, and whatever fog they do get
+    // finishes the job. Lower = darker.
+    const BG_BUILDING_DARKEN = 0.12;
     for (const rawName of BG_BUILDING_NODE_NAMES) {
       const node = street.getObjectByName(sanitizeGltfName(rawName));
       if (!node) {

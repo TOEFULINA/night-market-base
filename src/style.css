@@ -215,10 +215,17 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   #main-menu-list > li:not(.has-submenu),
   .menu-label {
     font-size: 19px;
-    /* Vertical padding is the tap target - 19px of text alone is a small
-       thing to hit accurately with a thumb. */
-    padding: 5px 0;
+    /* Tighter than it was: padding was 5px top AND bottom, so every pair of
+       items had 10px of dead space between them on top of the list's own gap
+       and the line box. Halved, and the line box pulled in from 1.15 to 1.0,
+       which is what was really doing it - at 19px that alone was ~3px of
+       leading above and below each label.
+       Still enough of a target to hit with a thumb; if it starts feeling
+       fiddly, put the padding back up rather than the line-height. */
+    padding: 2px 0;
+    line-height: 1;
   }
+  #main-menu-list { gap: 0; }
 
   .submenu { padding-left: 10px; }
   .submenu li {

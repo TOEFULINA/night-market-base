@@ -1415,6 +1415,12 @@ function closePortfolioGallery() {
   // rules (dark text + raised z-index so #main-menu reads over the white
   // gallery, submenu opens sideways instead of down).
   document.body.classList.remove('portfolio-open');
+  // Outside walk mode the logo click handler no-ops, so nothing else would
+  // ever clear .collapsed (pointer-events: none) and the corner menu would
+  // stay dead after closing the gallery. Restore it here. In walk mode leave
+  // it collapsed - that's the normal resting state there, and the logo
+  // toggle can reopen it.
+  if (mode !== 'walk') mainMenuListEl?.classList.remove('collapsed');
 }
 
 portfolioLightboxCloseBtn?.addEventListener('click', closePortfolioLightbox);
@@ -1441,6 +1447,10 @@ function showContactOverlay() {
 }
 function hideContactOverlay() {
   contactOverlayEl?.classList.add('hidden');
+  // Mirrors closePortfolioGallery's restore - navigateToRoute collapses the
+  // list when Contact opens regardless of mode, and outside walk mode the
+  // logo toggle can't bring it back.
+  if (mode !== 'walk') mainMenuListEl?.classList.remove('collapsed');
 }
 contactOverlayCloseBtn?.addEventListener('click', () => {
   hideContactOverlay();
@@ -1544,7 +1554,16 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   // the logo handler's own guard.
   if (PORTFOLIO_CATEGORIES[route]) {
     openPortfolioGallery(route);
-    if (mode === 'walk') collapseMainMenu();
+    // Collapse in EVERY mode now, not just walk. Opening a category from the
+    // title screen left the whole list expanded on top of the gallery - on a
+    // phone, where body.portfolio-open lays the list out as a ROW, that's
+    // five items running across the top straight into the category title.
+    // The original walk-only guard existed because nothing ever un-collapsed
+    // the list again outside walk mode, so collapsing from the title screen
+    // killed the corner menu permanently. That's fixed at the source instead:
+    // closePortfolioGallery() below re-opens it when returning to a mode that
+    // has no logo toggle of its own.
+    collapseMainMenu();
     return;
   }
 
@@ -1553,7 +1572,7 @@ function navigateToRoute(route, { pushHistory = true } = {}) {
   // wired yet" fallthrough below rather than after it.
   if (route === 'contact') {
     showContactOverlay();
-    if (mode === 'walk') collapseMainMenu();
+    collapseMainMenu(); // same reasoning as the portfolio branch above
     return;
   }
 

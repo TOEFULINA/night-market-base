@@ -164,6 +164,22 @@ const vinylExitBtn = document.getElementById('vinyl-exit-btn');
 vinylExitBtn?.addEventListener('click', () => vinylInteraction?.unlock());
 const vinylDebugPosEl = document.getElementById('vinyl-debug-pos'); // temporary - see index.html's comment on this element
 const debugPosEl = document.getElementById('debug-pos'); // back per your ask, see index.html's comment on this element
+
+// Dev-only coordinate readout - hidden unless you press D in walk mode.
+// It's how you grab LOCATIONS coordinates, but visitors were seeing the raw
+// x/y/z/yaw/pitch dump plus the "meshes:690 ... rebakes: disabled" status
+// line sitting over the scene on every desktop visit.
+// (This existed before and was lost in the rollback - restoring it.)
+let debugHudVisible = false;
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'd' && e.key !== 'D') return;
+  if (mode !== 'walk' || IS_MOBILE) return;
+  // Don't steal the key while something's being typed into.
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugHudVisible = !debugHudVisible;
+  if (debugPosEl) debugPosEl.style.display = debugHudVisible ? '' : 'none';
+});
 const touchControlsEl = document.getElementById('touch-controls'); // mobile joystick - see updateTouchControlsVisibility() below
 
 // Vinyl sample booth - "i want to be able to play songs and swap out the
@@ -550,7 +566,9 @@ function startTransition(routeKey) {
   collapseMainMenu();
   socialLinksEl?.classList.add('hidden');
   document.getElementById('menu-home-item')?.classList.remove('hidden'); // walk-mode-only item, see index.html
-  if (debugPosEl && !IS_MOBILE) debugPosEl.style.display = ''; // back on for walk mode's x/y/z/yaw readout - dev-only tool, no reason to show visitors on mobile
+  // Stays hidden on entering walk mode - press D to bring it up. See the
+  // keydown handler where debugHudVisible is declared.
+  if (debugPosEl) debugPosEl.style.display = debugHudVisible ? '' : 'none';
 
   // Controls' constructor snaps camera.position/rotation straight to its
   // default spawn pose - the flight's END point when no per-route location
@@ -1571,7 +1589,9 @@ const FOG_DRIFT_AMOUNT = 0.06; // +/- lightness
 // comment in index.html - delete the #debug-pos div (index.html + style.css)
 // and this block once you're done using it.
 function updatePositionDebug() {
-  if (!debugPosEl || !controls || IS_MOBILE) return; // dev-only tool - stays hidden and skips the per-frame work on mobile
+  // Skips the per-frame string building entirely on mobile, and while the
+  // readout is toggled off on desktop.
+  if (!debugPosEl || !controls || IS_MOBILE || !debugHudVisible) return;
   const p = controls.camera.position;
   const yawDeg = THREE.MathUtils.radToDeg(controls.yaw).toFixed(0);
   const pitchDeg = THREE.MathUtils.radToDeg(controls.pitch).toFixed(0);

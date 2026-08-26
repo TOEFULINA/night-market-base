@@ -626,8 +626,21 @@ function stopTitleOrbs() {
   }
 }
 
+// Off. The live orthographic title view is back on mobile - with the pixel
+// filtering and everything-unlit pass it reads the way the render did, so the
+// still isn't buying a look anymore.
+//
+// What it WAS also buying: the title appearing in ~1s instead of waiting for
+// the whole scene, because the still could go up as soon as a 500KB JPEG
+// decoded. That's gone with it - mobile is back to sitting on the loading
+// percentage until every model has arrived.
+//
+// Left as a flag rather than deleted so it's one word to bring back, and
+// title-mobile.jpg is still in public/ for the same reason.
+const USE_MOBILE_TITLE_STILL = false;
+
 function showTitleStill() {
-  if (!IS_MOBILE || !titleStillEl) return;
+  if (!USE_MOBILE_TITLE_STILL || !IS_MOBILE || !titleStillEl) return;
   titleStillEl.classList.remove('hidden');
   startTitleOrbs();
 }
@@ -639,7 +652,7 @@ function hideTitleStill() {
 
 // Tapping the still enters walk mode, same as tapping the live title view did.
 titleStillEl?.addEventListener('click', () => {
-  if (mode !== 'title') return;
+  if (!USE_MOBILE_TITLE_STILL || mode !== 'title') return;
   if (sceneReady) { startTransition(); return; }
   // Scene hasn't finished loading yet - put the loading screen back up and
   // enter automatically the moment it's done (see initLoadingUI below).
@@ -1658,7 +1671,7 @@ const post = createPostProcessing(renderer, scene, camera);
 // that. Tap early and the loading screen comes back for however long is
 // actually left, then walk mode starts on its own - so an early tap costs
 // you the wait you'd have had anyway, instead of doing nothing or breaking.
-if (IS_MOBILE) {
+if (IS_MOBILE && USE_MOBILE_TITLE_STILL) {
   const pre = new Image();
   pre.onload = () => {
     if (mode !== 'title') return;

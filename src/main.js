@@ -550,7 +550,96 @@ const EXPLORE_YAW_CLAMP = {
   max: THREE.MathUtils.degToRad(234),
 };
 
+// ---- Mobile title still -----------------------------------------------
+// The phone shows a pre-rendered image of the building instead of the live
+// orthographic view. Two reasons: it looks better than the low-res realtime
+// version, and while it's up the renderer skips drawing the scene entirely
+// (see tick), so the title screen costs essentially nothing.
+//
+// The light orbs still drift, drawn on a small 2D canvas over the image
+// rather than as three.js Points - same effect, no WebGL involved.
+const titleStillEl = document.getElementById('title-still');
+const titleOrbsCanvas = document.getElementById('title-orbs');
+let titleOrbsRaf = null;
+
+function startTitleOrbs() {
+  if (!IS_MOBILE || !titleOrbsCanvas || titleOrbsRaf !== null) return;
+  const ctx = titleOrbsCanvas.getContext('2d');
+  if (!ctx) return;
+  // Backing store at 1x regardless of device pixel ratio - these are soft
+  // blurred dots, so there's nothing for extra resolution to sharpen, and it
+  // keeps the canvas cheap.
+  const resize = () => {
+    titleOrbsCanvas.width = window.innerWidth;
+    titleOrbsCanvas.height = window.innerHeight;
+  };
+  resize();
+  window.addEventListener('resize', resize);
+
+  const ORB_COUNT = 26;
+  const orbs = Array.from({ length: ORB_COUNT }, () => ({
+    x: Math.random() * titleOrbsCanvas.width,
+    y: Math.random() * titleOrbsCanvas.height,
+    r: 1.2 + Math.random() * 2.6,
+    // Slow upward drift with a slight sideways wander, matching the 3D orbs'
+    // lazy float rather than anything that reads as "particles".
+    vy: -(3 + Math.random() * 9) / 60,
+    vx: (Math.random() - 0.5) * 0.35,
+    a: 0.18 + Math.random() * 0.42,
+    phase: Math.random() * Math.PI * 2,
+  }));
+
+  let t = 0;
+  const draw = () => {
+    t += 0.016;
+    const { width: w, height: h } = titleOrbsCanvas;
+    ctx.clearRect(0, 0, w, h);
+    for (const o of orbs) {
+      o.y += o.vy;
+      o.x += o.vx + Math.sin(t * 0.5 + o.phase) * 0.12;
+      if (o.y < -10) { o.y = h + 10; o.x = Math.random() * w; }
+      if (o.x < -10) o.x = w + 10;
+      if (o.x > w + 10) o.x = -10;
+      const twinkle = 0.75 + 0.25 * Math.sin(t * 1.6 + o.phase);
+      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 4);
+      g.addColorStop(0, `rgba(255, 214, 150, ${o.a * twinkle})`);
+      g.addColorStop(1, 'rgba(255, 214, 150, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    titleOrbsRaf = requestAnimationFrame(draw);
+  };
+  titleOrbsRaf = requestAnimationFrame(draw);
+}
+
+function stopTitleOrbs() {
+  if (titleOrbsRaf !== null) {
+    cancelAnimationFrame(titleOrbsRaf);
+    titleOrbsRaf = null;
+  }
+}
+
+function showTitleStill() {
+  if (!IS_MOBILE || !titleStillEl) return;
+  titleStillEl.classList.remove('hidden');
+  startTitleOrbs();
+}
+function hideTitleStill() {
+  if (!titleStillEl) return;
+  titleStillEl.classList.add('hidden');
+  stopTitleOrbs();
+}
+
+// Tapping the still enters walk mode, same as tapping the live title view did.
+titleStillEl?.addEventListener('click', () => {
+  if (mode === 'title') startTransition();
+});
+
 function startTransition(routeKey) {
+  hideTitleStill();
+
   if (mode === 'walk') return;
   mode = 'walk';
   hideAboutOverlay(); // defensive - can't actually be open yet on the title screen, but keep every flight's start state consistent
@@ -1058,6 +1147,11 @@ function updateTransition(delta) {
 // listeners don't pile up if you go home and re-enter several times.
 function finishReturnToTitle() {
   mode = 'title';
+  // Back on the title screen, so the mobile still goes up again (and the 3D
+  // render stops) exactly as on first load. Placed after the reverse flight
+  // lands rather than when Home is clicked, so you still see the camera pull
+  // back out instead of the image snapping in over it.
+  showTitleStill();
 
   controls?.dispose();
   controls = null;
@@ -1542,6 +1636,7 @@ const post = createPostProcessing(renderer, scene, camera);
 // those wait until the scene actually finishes loading instead of firing
 // immediately like the portfolio-category branch does.
 initLoadingUI(() => {
+  if (mode === 'title') showTitleStill();
   if (initialRoute && LOCATIONS[initialRoute]) {
     navigateToRoute(initialRoute, { pushHistory: false });
   }
@@ -1816,7 +1911,12 @@ function tick() {
     titleScreen.update(delta);
     post.renderPass.camera = titleScreen.camera;
   }
-  post.composer.render();
+  // While the mobile title still is up it completely covers the canvas, so
+  // there's nothing to see - skip the whole composer chain rather than render
+  // a frame nobody looks at. This is why the mobile title screen is close to
+  // free: no scene draw, no post passes, just a JPEG and 26 2D orbs.
+  const stillCovering = IS_MOBILE && titleStillEl && !titleStillEl.classList.contains('hidden');
+  if (!stillCovering) post.composer.render();
 
   requestAnimationFrame(tick);
 }

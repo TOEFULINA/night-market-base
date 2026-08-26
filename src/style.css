@@ -20,6 +20,31 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
    #loading-label progress-bar markup replaced entirely by a single
    standalone #loading-percent number set in Helvetica. Background matches
    the site's usual dark #05060a instead of the white first pass. */
+/* Mobile title still. z-index 8 puts it over the canvas (which has none) but
+   under #main-menu (12) and #social-links, so the corner nav still sits on
+   top of it exactly as it did over the 3D view.
+   background-size: cover crops rather than letterboxes - the render is 0.563
+   aspect and a tall phone is nearer 0.46, so some horizontal crop is
+   expected; center keeps the building's corner in frame. */
+#title-still {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  background-image: url('/title-mobile.jpg');
+  background-size: cover;
+  background-position: center;
+  background-color: #05060a;
+}
+#title-still.hidden { display: none; }
+#title-orbs {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none; /* taps fall through to the enter-walk-mode handler */
+}
+
 #loading-screen {
   position: fixed;
   inset: 0;

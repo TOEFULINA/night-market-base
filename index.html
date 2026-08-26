@@ -87,6 +87,16 @@
     </a>
   </div>
 
+  <!-- Mobile title screen - a pre-rendered still of the building instead of
+       the live orthographic 3D view. Sits ABOVE the canvas, so while it's up
+       the renderer doesn't draw the scene at all (see main.js's tick) - the
+       single biggest thing the phone isn't doing anymore.
+       #title-orbs is a small 2D canvas layered on top for the drifting light
+       orbs, so the atmosphere survives without any WebGL. -->
+  <div id="title-still" class="mobile-only hidden">
+    <canvas id="title-orbs"></canvas>
+  </div>
+
   <div id="loading-screen">
     <img id="loading-logo" src="/logo.png" alt="loading" />
     <div id="loading-percent">0%</div>

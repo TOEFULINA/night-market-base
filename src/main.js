@@ -1600,7 +1600,39 @@ function updateTouchControlsVisibility() {
   touchControlsEl.classList.toggle('hidden', !show);
 }
 
+// WebGL context loss + recovery.
+//
+// "it glitches out every time i screenshot" - taking a screenshot makes iOS
+// snapshot the whole app, which briefly spikes memory. On a page already
+// holding a lot of GPU state, the system responds by yanking the WebGL
+// context out from under us. Without the two listeners below that's
+// permanent: every subsequent draw call silently fails and you're left
+// looking at a frozen or garbled canvas until a manual reload.
+//
+// Two things make recovery work, and both are easy to get wrong:
+//   1. preventDefault() on the lost event. The browser will NOT attempt to
+//      restore a context unless the page explicitly asks it to this way.
+//   2. Stopping the rAF loop while it's gone. Rendering into a dead context
+//      throws warnings every frame and can prevent restoration.
+// three.js re-uploads textures and geometry lazily on the next render after
+// the context comes back, so nothing here needs to rebuild the scene.
+let glContextLost = false;
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  glContextLost = true;
+  console.warn('[webgl] context lost - pausing render loop until restored');
+}, false);
+canvas.addEventListener('webglcontextrestored', () => {
+  glContextLost = false;
+  console.warn('[webgl] context restored - resuming');
+  requestAnimationFrame(tick);
+}, false);
+
 function tick() {
+  // Loop deliberately ends here while the context is gone; the restore
+  // handler above is what starts it again.
+  if (glContextLost) return;
+
   const delta = Math.min(clock.getDelta(), 0.1); // clamp so tab-switch stalls don't teleport the player
   elapsed += delta;
   flickerUniforms.uTime.value = elapsed; // drives every emissive sign's flicker shader at once, see shading.js

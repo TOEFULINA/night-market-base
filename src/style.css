@@ -311,53 +311,6 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
   }
   #portfolio-lightbox-close { top: 16px; right: 18px; }
 
-  /* ---- About Me on touch -------------------------------------------------
-     The overlay was built at desktop scale - 56px headings, 48px grid gutters,
-     24px box padding - and none of it was ever scaled down. On a phone that
-     left huge gaps between everything and text far larger than the layout.
-     Everything below is the same design at roughly half scale, so the
-     two-column structure reads the way it does on desktop instead of looking
-     like desktop text crammed into a narrow column. */
-  #about-overlay-scroll {
-    top: 76px;
-    padding: 0 14px 40px;
-  }
-  .about-header-row { gap: 12px; }
-  .about-header h1 { font-size: 26px; }
-  .about-header h2 { font-size: 15px; margin: 0 0 8px; }
-
-  .about-contact-list {
-    font-size: 11px;
-    gap: 5px;
-    margin: 0 0 14px;
-  }
-  .about-contact-list svg { width: 12px; height: 12px; }
-
-  .about-columns { gap: 12px; margin-top: 14px; }
-
-  .about-box {
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-width: 1px;
-  }
-  .about-box h3 { font-size: 14px; }
-  .about-box p { font-size: 11px; line-height: 1.45; margin: 0 0 8px; }
-
-  .about-tag-box {
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-width: 1px;
-  }
-  .about-tag-box h4 { font-size: 11px; margin: 0 0 5px; }
-  .about-tag-box li { font-size: 10px; }
-
-  .about-updated { font-size: 9px; margin: 0 0 8px; }
-  .about-box-button { font-size: 11px; padding: 6px 12px; }
-
-  /* Frame around the model's head - the fixed 300px desktop column made this
-     enormous on a phone; the % column above already sizes it, this just keeps
-     the outline proportional to everything else. */
-  .about-profile-pic { border-width: 1px; }
 }
 
 #touch-controls {
@@ -1375,3 +1328,58 @@ body.about-open #main-menu-list {
   border-radius: 4px;
 }
 
+
+/* Mobile About Me overrides live at the END of this file on purpose.
+   Media queries carry no extra specificity, so `.about-header h1` inside a
+   media query and `.about-header h1` outside one are an exact tie - and ties
+   are broken by source order. The desktop .about-* rules are defined further
+   up, so anything mobile-specific placed above them silently loses. */
+@media (hover: none) and (pointer: coarse) {
+/* ---- About Me on touch -------------------------------------------------
+   The overlay was built at desktop scale - 56px headings, 48px grid gutters,
+   24px box padding - and none of it was ever scaled down. On a phone that
+   left huge gaps between everything and text far larger than the layout.
+   Everything below is the same design at roughly half scale, so the
+   two-column structure reads the way it does on desktop instead of looking
+   like desktop text crammed into a narrow column. */
+#about-overlay-scroll {
+  top: 76px;
+  padding: 0 14px 40px;
+}
+.about-header-row { gap: 12px; }
+.about-header h1 { font-size: 26px; }
+.about-header h2 { font-size: 15px; margin: 0 0 8px; }
+
+.about-contact-list {
+  font-size: 11px;
+  gap: 5px;
+  margin: 0 0 14px;
+}
+.about-contact-list svg { width: 12px; height: 12px; }
+
+.about-columns { gap: 12px; margin-top: 14px; }
+
+.about-box {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-width: 1px;
+}
+.about-box h3 { font-size: 14px; }
+.about-box p { font-size: 11px; line-height: 1.45; margin: 0 0 8px; }
+
+.about-tag-box {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-width: 1px;
+}
+.about-tag-box h4 { font-size: 11px; margin: 0 0 5px; }
+.about-tag-box li { font-size: 10px; }
+
+.about-updated { font-size: 9px; margin: 0 0 8px; }
+.about-box-button { font-size: 11px; padding: 6px 12px; }
+
+/* Frame around the model's head - the fixed 300px desktop column made this
+   enormous on a phone; the % column above already sizes it, this just keeps
+   the outline proportional to everything else. */
+.about-profile-pic { border-width: 1px; }
+}

@@ -144,6 +144,11 @@ const { updateAtmosphere } = buildWorld(scene, renderer);
 // its constructor immediately wires up the WASD/drag-look intro overlay,
 // which shouldn't be showing while the title screen is up.
 let mode = 'title';
+// Set once every model has loaded. The mobile title still appears long before
+// this, so a tap can arrive while the scene is still streaming - see the
+// #title-still click handler and initLoadingUI below.
+let sceneReady = false;
+let enterQueued = false;
 let controls = null;
 let signsBound = false;
 let vinylInteraction = null;
@@ -634,7 +639,13 @@ function hideTitleStill() {
 
 // Tapping the still enters walk mode, same as tapping the live title view did.
 titleStillEl?.addEventListener('click', () => {
-  if (mode === 'title') startTransition();
+  if (mode !== 'title') return;
+  if (sceneReady) { startTransition(); return; }
+  // Scene hasn't finished loading yet - put the loading screen back up and
+  // enter automatically the moment it's done (see initLoadingUI below).
+  enterQueued = true;
+  hideTitleStill();
+  document.getElementById('loading-screen')?.classList.remove('hidden');
 });
 
 function startTransition(routeKey) {
@@ -1635,10 +1646,37 @@ const post = createPostProcessing(renderer, scene, camera);
 // routes need the real 3D scene (camera flight through real geometry), so
 // those wait until the scene actually finishes loading instead of firing
 // immediately like the portfolio-category branch does.
+// Mobile: show the title immediately, load the city behind it.
+//
+// This is the actual point of the pre-rendered still, and I had it gated on
+// loading FINISHING, which defeated the whole thing - the phone still sat on
+// a percentage until every model had arrived. Now the still goes up as soon
+// as the JPEG itself decodes (~500KB, near-instant) and the loading screen
+// gets dismissed with it. The scene keeps streaming in behind.
+//
+// The catch: you can tap through before the scene exists. sceneReady tracks
+// that. Tap early and the loading screen comes back for however long is
+// actually left, then walk mode starts on its own - so an early tap costs
+// you the wait you'd have had anyway, instead of doing nothing or breaking.
+if (IS_MOBILE) {
+  const pre = new Image();
+  pre.onload = () => {
+    if (mode !== 'title') return;
+    showTitleStill();
+    document.getElementById('loading-screen')?.classList.add('hidden');
+  };
+  pre.src = '/title-mobile.jpg';
+}
+
 initLoadingUI(() => {
+  sceneReady = true;
   if (mode === 'title') showTitleStill();
   if (initialRoute && LOCATIONS[initialRoute]) {
     navigateToRoute(initialRoute, { pushHistory: false });
+  } else if (enterQueued) {
+    // Tapped through while it was still loading - go now.
+    enterQueued = false;
+    startTransition();
   }
 });
 

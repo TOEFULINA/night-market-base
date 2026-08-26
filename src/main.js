@@ -5,7 +5,8 @@ import { initLoadingUI, initKtx2Loader } from './loader.js';
 import { TitleScreen } from './titleScreen.js';
 import { createPostProcessing, grainUniforms } from './postprocessing.js';
 import { flickerUniforms } from './shading.js';
-import { VinylInteraction } from './vinylInteraction.js';
+import { VinylInteraction, RECORD_PLAYER_NODE_NAME } from './vinylInteraction.js';
+import { Interactables } from './interactables.js';
 
 const canvas = document.getElementById('scene');
 
@@ -154,6 +155,28 @@ let signsBound = false;
 let vinylInteraction = null;
 let vinylBound = false;
 let coverPlanesBound = false;
+
+// Clickable-thing sparkles - "add a cute video game effect to clickable things
+// so ppl know to interact with them." Constructed here but empty of geometry
+// until bind() resolves the node names against the loaded street mesh (same
+// lazy-bind pattern as titleScreen.bindSigns / vinylInteraction.bindTarget).
+// Ranges are deliberately a touch wider than each thing's own click range, so
+// the sparkles are already visible by the time clicking actually works rather
+// than appearing at the exact moment you're close enough.
+const interactables = new Interactables(scene, camera);
+interactables.register({
+  key: 'record-player',
+  meshNames: [RECORD_PLAYER_NODE_NAME],
+  range: 4.5,
+});
+interactables.register({
+  key: 'record-wall-display',
+  meshNames: ['VinylWall_Cylinder023', 'VinylShelf_Cube001', 'VinylShelf_Cube180'],
+  range: 6,
+  spread: 0.4,
+});
+// The archive-store computer registers itself here too once its node name is
+// known - see the archive-computer entry in CLICK_ZOOM_SPOTS below.
 let recordDiscBound = false;
 // "popping up when you enter any of the explore mode spaces for the first
 // time" - set the instant the FIRST title->walk flight starts (startTransition
@@ -871,8 +894,23 @@ function flyToLocation(routeKey, fromRouteKey) {
 // briefly for a shelf whose books turned out to be dozens of separately
 // auto-named meshes with nothing to group them by; removed per your ask, but
 // resolveClickZoomMeshes below still supports it if that ever comes back.)
+// Two kinds of spot now:
+//   routeKey -> flies the camera to LOCATIONS[routeKey] (the original behavior)
+//   href     -> opens an external URL in a new tab, same as the corner menu's
+//               data-href items (see the #main-menu-list li[data-href] handler)
+// A spot needs a `range` either way; href spots carry `anchor` (world
+// coordinates) since they have no LOCATIONS entry to measure distance against.
 const CLICK_ZOOM_SPOTS = [
   { routeKey: 'record-wall-display', range: 6, meshNames: ['VinylWall_Cylinder023', 'VinylShelf_Cube001', 'VinylShelf_Cube180'] },
+  // Archive-store computer -> toefu.nyc, the same destination the Loot menu
+  // item points at. meshNames is empty until the node name is confirmed:
+  // nothing in the scene GLB is named anything computer-like near the archive
+  // shop, so it's inside a merged mesh with a generic auto-name. Press ` and
+  // click it to read the name off the debug HUD (see PICK MODE in the click
+  // handler below), then drop that name in here and the spot goes live -
+  // resolveClickZoomMeshes returns null for an empty list, so until then this
+  // entry is simply skipped rather than erroring.
+  { key: 'archive-computer', href: 'https://www.toefu.nyc', range: 4, anchor: { x: -2.74, y: 1.0, z: -18.01 }, meshNames: [] },
 ];
 const clickZoomMeshCache = new Map(); // routeKey -> resolved meshes, only used by the meshNames strategy
 const clickZoomRaycaster = new THREE.Raycaster();
@@ -880,6 +918,7 @@ const clickZoomPointer = new THREE.Vector2();
 
 function resolveClickZoomMeshes(spot) {
   if (!spot.meshNames) return streetScene ? [streetScene] : null; // proximity mode - raycast everything
+  if (spot.meshNames.length === 0) return null; // declared but not yet identified - see the archive-computer spot
   if (clickZoomMeshCache.has(spot.routeKey)) return clickZoomMeshCache.get(spot.routeKey);
   if (!streetScene) return null;
   const found = spot.meshNames.map((name) => streetScene.getObjectByName(name)).filter((obj) => obj && obj.isMesh);
@@ -900,8 +939,29 @@ renderer.domElement.addEventListener('click', (e) => {
   clickZoomPointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   clickZoomRaycaster.setFromCamera(clickZoomPointer, camera);
 
+  // PICK MODE - only while the debug HUD is up (backtick). Clicking anything
+  // prints the mesh's sanitized node name into the HUD instead of triggering
+  // an interaction. This exists because identifying a specific mesh has come
+  // up over and over (which plane is the ground, which box is the tactile
+  // strip, which mesh is the computer) and every previous round needed a
+  // desktop console. Now it's readable on screen.
+  if (debugHudVisible && debugPosEl) {
+    const picked = clickZoomRaycaster.intersectObject(streetScene, true);
+    if (picked.length > 0) {
+      const obj = picked[0].object;
+      const matNames = (Array.isArray(obj.material) ? obj.material : [obj.material])
+        .filter(Boolean).map((m) => m.name).join(', ');
+      console.log('[pick]', obj.name, '| material:', matNames, '| parent:', obj.parent?.name);
+      debugPosEl.textContent += `\n--- picked ---\nmesh: ${obj.name}\nmat: ${matNames}`;
+      return; // don't also fire an interaction while picking
+    }
+  }
+
   for (const spot of CLICK_ZOOM_SPOTS) {
-    const target = LOCATIONS[spot.routeKey];
+    // routeKey spots measure distance against their LOCATIONS entry; href
+    // spots carry their own anchor since they have no LOCATIONS entry.
+    const target = spot.routeKey ? LOCATIONS[spot.routeKey] : spot.anchor;
+    if (!target) continue;
     const dist = camera.position.distanceTo(new THREE.Vector3(target.x, target.y, target.z));
     if (dist > spot.range) continue; // too far away to "walk up and look" at this one - cheaper than raycasting first
 
@@ -912,7 +972,14 @@ renderer.domElement.addEventListener('click', (e) => {
     const hits = clickZoomRaycaster.intersectObjects(meshes, !spot.meshNames);
     if (hits.length === 0) continue;
 
-    flyToLocation(spot.routeKey);
+    if (spot.href) {
+      // noopener/noreferrer for the same reason the menu's data-href items
+      // use them: the opened page gets no window.opener handle back into this
+      // one. Matches the Loot menu item exactly.
+      window.open(spot.href, '_blank', 'noopener,noreferrer');
+    } else {
+      flyToLocation(spot.routeKey);
+    }
     return;
   }
 });
@@ -1883,6 +1950,11 @@ function tick() {
     vinylInteraction.bindTarget(streetScene);
     vinylBound = true;
   }
+  // Sparkles bind independently of vinylBound above - they don't need walk
+  // mode to exist (unlike vinylInteraction), only the street mesh. bind() is
+  // a no-op for entries that are already bound, so calling it every frame
+  // until everything resolves is free.
+  if (streetSceneStatus.state === 'loaded') interactables.bind(streetScene);
   // Cover mesh planes load from their own tiny standalone GLB (world.js's
   // albumCoverPlanes), independently of the street scene/vinylBound above -
   // sync whatever track loadVinylTrack last set (or the default, index 0,
@@ -1955,6 +2027,13 @@ function tick() {
     }
     updateExploreNavVisibility(); // hides the </> arrows the moment you move away from an Explore spot
     updatePositionDebug();
+    // Sparkles only make sense while free-walking: they're an affordance for
+    // "you can click this", and you can't click anything mid-flight, locked
+    // into the vinyl booth, or on the title screen. Hiding the group skips
+    // the whole subtree in three's render traversal too.
+    const sparklesOn = mode === 'walk' && controls?.locked === false;
+    interactables.group.visible = sparklesOn;
+    if (sparklesOn) interactables.update(elapsed);
 
     post.tiltShiftPass.enabled = orthoActive;
     // Distance blur - walk mode's perspective camera only, and only once

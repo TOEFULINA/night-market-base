@@ -326,26 +326,53 @@ html, body { height: 100%; overflow: hidden; background: #05060a; font-family: s
    showing on mobile the whole time (title screen, vinyl booth locked in,
    About/Portfolio overlays), not just while actually free-walking. */
 #touch-controls.hidden { display: none; }
+/* 8-bit joystick.
+   Square instead of round, hard edges instead of soft alpha, and a chunky
+   3px border - the round translucent version read as modern-app UI against a
+   scene that's deliberately DS-era everywhere else.
+   No clip-path on the zone on purpose: clip-path clips CHILDREN, and the knob
+   travels all the way to the zone's edge (controls.js allows rect.width / 2),
+   so notching the container would slice the knob in half at full deflection.
+   The notch goes on the knob instead, which has no children. */
 #joystick-zone {
   position: absolute;
-  left: 28px;
-  bottom: 28px;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  background: rgba(244, 231, 193, 0.12);
-  border: 1px solid rgba(244, 231, 193, 0.25);
+  left: 24px;
+  bottom: 24px;
+  width: 104px;
+  height: 104px;
+  background: rgba(10, 8, 6, 0.45);
+  border: 3px solid rgba(244, 231, 193, 0.55);
+  box-shadow: 0 0 0 3px rgba(10, 8, 6, 0.45); /* second "pixel" ring, no blur */
   pointer-events: auto;
 }
+/* Crosshair guides - two 3px bars, pure sprite dressing. */
+#joystick-zone::before,
+#joystick-zone::after {
+  content: '';
+  position: absolute;
+  background: rgba(244, 231, 193, 0.18);
+}
+#joystick-zone::before { left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px; }
+#joystick-zone::after { top: 0; bottom: 0; left: 50%; width: 3px; margin-left: -1.5px; }
+
 #joystick-knob {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
-  border-radius: 50%;
-  background: rgba(244, 161, 62, 0.85);
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;
+  background: #f4a13e;
+  border: 3px solid #2a1a08;
+  /* Chamfered corners - the classic pixel-UI way of drawing a "round" shape
+     on a grid. transform is left alone entirely: controls.js writes to it
+     every frame to move the knob. */
+  clip-path: polygon(
+    6px 0, calc(100% - 6px) 0,
+    100% 6px, 100% calc(100% - 6px),
+    calc(100% - 6px) 100%, 6px 100%,
+    0 calc(100% - 6px), 0 6px
+  );
 }
 
 /* Main menu overlay - title screen only, see index.html/main.js for the

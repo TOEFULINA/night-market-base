@@ -42,12 +42,14 @@
           <li data-route="explore-packaging">Packaging</li>
         </ul>
       </li>
-      <!-- External link, not a route - handled by the data-href branch in
-           main.js's menu click handler rather than navigateToRoute, since
-           there's nothing in this scene to fly to. -->
-      <li data-href="https://www.toefu.nyc">Loot</li>
       <li data-route="contact">Contact</li>
       <li data-route="about">About</li>
+      <!-- External link, not a route - handled by the data-href branch in
+           main.js's menu click handler rather than navigateToRoute, since
+           there's nothing in this scene to fly to.
+           Sits last on the title screen; in walk mode the Home item below
+           is revealed and takes the last slot instead. -->
+      <li data-href="https://www.toefu.nyc">Loot</li>
       <!-- Walk-mode dropdown only - hidden on the title screen's copy of
            this same list (see #menu-home-item.hidden in style.css / the
            reveal in startTransition() in main.js). Flies back to the exact
